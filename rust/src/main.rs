@@ -330,14 +330,15 @@ fn print_report(rep: &Report, wall: f64, total_ops: u64, latency: bool) {
     );
     if latency {
         let h = &rep.hist;
+        let us = |q: f64| h.value_at_quantile(q) as f64 / 1_000.0;
         println!(
-            "  latency ns: p50={} p90={} p99={} p99.9={} p99.99={} max={} (n={})",
-            h.value_at_quantile(0.50),
-            h.value_at_quantile(0.90),
-            h.value_at_quantile(0.99),
-            h.value_at_quantile(0.999),
-            h.value_at_quantile(0.9999),
-            h.max(),
+            "  latency µs: p50={:.3} p90={:.3} p99={:.3} p99.9={:.1} p99.99={:.1} max={:.1} (n={})",
+            us(0.50),
+            us(0.90),
+            us(0.99),
+            us(0.999),
+            us(0.9999),
+            h.max() as f64 / 1_000.0,
             h.len()
         );
     }

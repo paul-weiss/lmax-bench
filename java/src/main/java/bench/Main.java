@@ -275,10 +275,11 @@ public final class Main {
         if (latency) {
             Histogram h = rep.hist();
             System.out.printf(
-                    "  latency ns: p50=%d p90=%d p99=%d p99.9=%d p99.99=%d max=%d (n=%d)%n",
-                    h.getValueAtPercentile(50), h.getValueAtPercentile(90),
-                    h.getValueAtPercentile(99), h.getValueAtPercentile(99.9),
-                    h.getValueAtPercentile(99.99), h.getMaxValue(), h.getTotalCount());
+                    "  latency µs: p50=%.3f p90=%.3f p99=%.3f p99.9=%.1f p99.99=%.1f max=%.1f (n=%d)%n",
+                    h.getValueAtPercentile(50) / 1000.0, h.getValueAtPercentile(90) / 1000.0,
+                    h.getValueAtPercentile(99) / 1000.0, h.getValueAtPercentile(99.9) / 1000.0,
+                    h.getValueAtPercentile(99.99) / 1000.0, h.getMaxValue() / 1000.0,
+                    h.getTotalCount());
         }
     }
 

@@ -21,14 +21,17 @@ is the whole story in trading systems.
 **Latency** (2M ops paced at 250k ops/s, publish→processed, HdrHistogram,
 scheduled-time stamping to avoid coordinated omission):
 
-| percentile | Java | Rust |
+All values in **microseconds** (one unit throughout, so magnitudes compare at
+a glance):
+
+| percentile | Java (µs) | Rust (µs) |
 |---|---:|---:|
-| p50 | 166 ns | 167 ns |
-| p90 | 541 ns | 459 ns |
-| p99 | 3.4 µs | 2.8 µs |
-| p99.9 | **5.8 ms** | **38.5 µs** |
-| p99.99 | 11.2 ms | 1.66 ms |
-| max | 11.8 ms | 2.15 ms |
+| p50 | 0.166 | 0.167 |
+| p90 | 0.541 | 0.459 |
+| p99 | 3.4 | 2.8 |
+| p99.9 | **5,816** | **38.5** |
+| p99.99 | 11,215 | 1,660 |
+| max | 11,788 | 2,152 |
 
 Both runs print a deterministic checksum of the final book and identical
 fill/volume counts — on every run both implementations produce the **same
