@@ -75,8 +75,11 @@ Price-time priority, continuous matching, with **lazy cancellation**:
     next best.
   Any remaining qty **rests**: append the id to the FIFO at its price
   (creating the level if needed) and insert it into the live map.
-- **CANCEL**: remove the id from the live map only. Cancelling an id that is
-  not live is a no-op. Do not touch the level queues.
+- **CANCEL**: remove the id from the live map. Cancelling an id that is not
+  live is a no-op. The references leave the id in its level queue as a
+  tombstone (lazy cancellation, skipped at the head later); removing it from
+  the queue eagerly is behaviorally equivalent — dead ids are invisible to
+  both matching and the checksum — so either strategy conforms.
 
 ## 4. Required statistics
 
@@ -112,5 +115,6 @@ numbers. Both engines (`ENGINE=tuned` or default) produce the same vectors.
 
 If your implementation disagrees: the most common divergences are, in order —
 signed shifts or signed `mod` where unsigned is required (§1–2); the partially
-filled head being re-queued instead of left in place (§3); cancels mutating
-the level queues (§3); and checksum iteration order (§4).
+filled head being re-queued instead of left in place (§3); counting one fill
+per incoming order instead of one per resting order matched (§4); and
+checksum iteration order or a missing one-`next()` fold (§4).
