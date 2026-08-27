@@ -1,68 +1,84 @@
 # lmax-bench
 
-The same limit-order-book matching engine, built twice on the LMAX architecture —
-once in **Java on the original [LMAX Disruptor](https://github.com/LMAX-Exchange/disruptor)**,
-once in **Rust on the [`disruptor`](https://crates.io/crates/disruptor) crate** — and
-benchmarked head-to-head on a bit-identical workload.
+The same limit-order-book matching engine, built three times on the LMAX
+architecture —
+**Java on the original [LMAX Disruptor](https://github.com/LMAX-Exchange/disruptor)**,
+**Rust on the [`disruptor`](https://crates.io/crates/disruptor) crate**, and
+**Go on a hand-rolled SPSC busy-spin ring buffer** (no maintained Disruptor
+port exists; the pattern is ~60 lines) — benchmarked head-to-head on a
+bit-identical workload.
 
-The interesting result is not "Rust is faster." At the median they are
-**indistinguishable (~166 ns)**. The difference lives in the tail, and the tail
-is the whole story in trading systems.
+The interesting result is not "Rust is fastest" (it is, at the median and in
+throughput). It's that **each runtime puts its latency somewhere different**:
+Java pays in the tail (GC), Go pays at the median and in throughput but keeps
+a remarkably tight tail (concurrent sub-ms GC), and Rust pays nowhere — until
+the OS scheduler becomes its tail. In trading systems the tail is the story.
 
 ## Results (Apple M1 Max, macOS, out of the box — see Methodology)
 
-**Throughput** (10M ops, producer publishing as fast as the ring accepts):
+**Throughput** (10M ops, producer publishing as fast as the ring accepts;
+ranges across repeated runs):
 
-| | Java (com.lmax.disruptor 4.0) | Rust (disruptor 4.4) |
-|---|---:|---:|
-| ops/s | 8.8M | 14.5M |
-| GC | 9 collections, 41 ms pause | — (310,882 heap allocations) |
+| | Java (disruptor 4.0) | Rust (disruptor 4.4) | Go (SPSC ring) |
+|---|---:|---:|---:|
+| ops/s | 8.0–8.8M | 13.1–14.5M | 5.7–6.9M |
+| GC | 8–9 collections, 41–48 ms pause | — | 13 cycles, **1.2 ms** total STW |
+| heap allocations | (boxed keys, order objects) | 310,882 | 567,939 |
 
 **Latency** (2M ops paced at 250k ops/s, publish→processed, HdrHistogram,
-scheduled-time stamping to avoid coordinated omission):
+scheduled-time stamping to avoid coordinated omission). All values in
+**microseconds**; each cell is the range observed across four runs, because on
+an un-isolated desktop the run-to-run spread *is* part of the result:
 
-All values in **microseconds** (one unit throughout, so magnitudes compare at
-a glance):
+| percentile | Java (µs) | Rust (µs) | Go (µs) |
+|---|---:|---:|---:|
+| p50 | 0.25 – 0.42 | 0.17 – 0.29 | 0.33 – 0.50 |
+| p90 | 0.67 – 0.79 | 0.54 – 0.58 | 0.71 – 0.83 |
+| p99 | 6.6 – 440 | 3.5 – 13.3 | 3.6 – 14.8 |
+| p99.9 | **1,674 – 8,208** | 37 – 3,070 | **29 – 48** |
+| p99.99 | 4,018 – 13,509 | 2,204 – 8,294 | 79 – 179 |
+| max | 4,481 – 14,017 | 2,806 – 8,897 | 165 – 744 |
 
-| percentile | Java (µs) | Rust (µs) |
-|---|---:|---:|
-| p50 | 0.166 | 0.167 |
-| p90 | 0.541 | 0.459 |
-| p99 | 3.4 | 2.8 |
-| p99.9 | **5,816** | **38.5** |
-| p99.99 | 11,215 | 1,660 |
-| max | 11,788 | 2,152 |
-
-Both runs print a deterministic checksum of the final book and identical
-fill/volume counts — on every run both implementations produce the **same
-checksum**, proving they processed a bit-identical operation stream through
-identical matching logic. This is what makes the comparison meaningful.
+Every run of every implementation prints a deterministic checksum of the final
+book plus fill/volume counts — and **all three languages produce the same
+checksum on the same workload**, proving they processed a bit-identical
+operation stream through identical matching logic. This is what makes the
+comparison meaningful.
 
 ## What this shows
 
 1. **The architecture, not the language, sets the median.** A single-writer
-   core behind a ring buffer processes an order in ~166 ns in either language.
-   If your p50 is what you care about, idiomatic Java on the Disruptor is
+   core behind a ring buffer processes an order in a few hundred nanoseconds
+   in all three languages. If p50 is what you care about, any of them is
    already there.
-2. **The tail is where the languages part.** Java's p99.9 is ~150x worse here,
-   and the GC counters point at why: the idiomatic-collections book
-   (`TreeMap<Long, ArrayDeque<Long>>`, boxed `Long`s, a `Resting` object per
-   passive order) produces steady garbage, and collections land in the latency
-   distribution exactly where trading systems can least afford them. The Rust
-   book has the same *logical* allocation profile (BTreeMap nodes, deque
-   growth), but no collector — cost is paid inline and stays bounded.
-3. **Rust's tail is not zero either.** p99.99 of 1.66 ms on macOS without core
-   pinning is scheduler jitter — a reminder that past the GC, the OS is the
-   next boss fight.
-4. **This is not the ceiling for Java.** LMAX themselves ran (and run) Java in
-   production by *not writing idiomatic Java on the hot path*: pre-allocated
-   object pools, [Agrona](https://github.com/aeron-io/agrona) primitive
-   collections, flyweights over buffers — zero-garbage steady state. See
-   Future work.
+2. **Java's tail is GC-bound and reproduces every run.** p99.9 in the
+   milliseconds, every time, tracking the collection counters one-for-one.
+   The idiomatic-collections book (`TreeMap<Long, ArrayDeque<Long>>`, boxed
+   `Long`s, an object per resting order) produces steady garbage, and G1's
+   pauses land in the distribution exactly where trading systems can least
+   afford them.
+3. **Go is the surprise: the tightest, most reproducible tail of the three.**
+   Its collector is *designed* for this — fully concurrent marking with
+   sub-millisecond stop-the-world phases (1.2 ms total across 13 cycles here,
+   vs Java's 41–48 ms across 9). The GC runs, constantly, and barely shows at
+   p99.99. The price appears elsewhere: the lowest throughput (write barriers,
+   allocation cost, no free lunch) and a slightly higher median. **GC design
+   matters more than GC presence.**
+4. **Rust has the best median and throughput, and its tail belongs to the
+   OS.** With no collector, what's left at p99.9+ is scheduler preemption and
+   core migration — which on an unpinned macOS desktop swings its tail from
+   37 µs to 3 ms run-to-run. Removing the GC doesn't grant a flat histogram;
+   it promotes the platform to your biggest tail source, and pinning,
+   isolation, and allocation-free steady state are still on you.
+5. **None of this is any language's ceiling.** LMAX ran Java in production by
+   refusing to allocate on the hot path (object pools,
+   [Agrona](https://github.com/aeron-io/agrona) primitive collections,
+   flyweights); low-garbage Go (`sync.Pool`, preallocation, value types) is
+   standard practice in Go trading shops for the same reason. See Future work.
 
 ## Architecture
 
-Both sides are the same shape — the LMAX pattern:
+All three are the same shape — the LMAX pattern:
 
 ```
 producer thread                    consumer thread (single writer)
@@ -72,6 +88,10 @@ producer thread                    consumer thread (single writer)
 ```
 
 - One producer, one consumer, busy-spin on both sides, ring size 65,536.
+- Transports: Java uses the original Disruptor (`BusySpinWaitStrategy`,
+  `ProducerType.SINGLE`); Rust the `disruptor` crate (`BusySpin`); Go a
+  hand-rolled SPSC ring — two cache-line-padded atomic cursors over a
+  pre-allocated event array (`go/main.go`), both threads `LockOSThread`ed.
 - All book state is owned by the consumer thread: no locks, no sharing, no
   concurrent data structures. Determinism is a design property, which is what
   makes the cross-language checksum possible at all.
@@ -80,8 +100,10 @@ producer thread                    consumer thread (single writer)
 
 Price-time priority continuous limit-order-book matching:
 
-- Two sides of price levels (`TreeMap`/`BTreeMap`), each level a FIFO queue of
-  order ids; an id→order hash map for O(1) cancel.
+- Two sides of price levels (Java `TreeMap`, Rust `BTreeMap`, Go
+  `google/btree` — Go's stdlib has no ordered map, so the closest idiomatic
+  equivalent is used), each level a FIFO queue of order ids; an id→order hash
+  map for O(1) cancel.
 - An incoming limit order sweeps crossing opposite levels best-first, FIFO
   within a level; any residual rests.
 - Cancels are **lazy**: removal from the id map only; dead ids are skipped when
@@ -90,7 +112,7 @@ Price-time priority continuous limit-order-book matching:
 
 ### The workload
 
-Deterministic, generated by splitmix64 implemented identically in both
+Deterministic, generated by splitmix64 implemented identically in all three
 languages (seed 42): 55% passive limits (1–20 ticks behind the touch), 30%
 aggressive limits (0–9 ticks into/through the spread), 15% cancels of recent
 ids; the mid random-walks in [500, 1500]. ~68% of limit orders end up trading.
@@ -109,9 +131,9 @@ ids; the mid random-walks in [500, 1500]. ~68% of limit orders end up trading.
   JVM/one binary run per mode, default JVM flags (JDK 22, default G1). Treat
   absolute numbers as indicative, deltas as the signal. Run-to-run tail
   variance is large on a shared machine — Rust's p99.9 has been observed
-  anywhere from ~40 µs to ~1 ms across runs (scheduler noise), while Java's
-  multi-millisecond p99.9+ reproduces every run and tracks the GC counters;
-  that reproducibility is the actual finding. Linux + pinned cores
+  anywhere from ~40 µs to ~3 ms across runs (scheduler noise), while Java's
+  multi-millisecond p99.9+ and Go's tens-of-microseconds p99.9 both reproduce
+  every run; that reproducibility is the actual finding. Linux + pinned cores
   + JMH-style forking would tighten all of it (see below).
 
 ## Run it
@@ -124,16 +146,21 @@ cd rust && cargo build --release
 # Java
 cd java && mvn -q package
 java -jar target/clob-bench-0.1.0.jar all  # same subcommands
+
+# Go
+cd go && go build -o clob-bench .
+./clob-bench all                           # same subcommands
 ```
 
-Or both, with a comparison, via `./run.sh`.
+Or all three, back to back, via `./run.sh`.
 
 ## Future work
 
-- **A zero-garbage Java variant** (object pools + Agrona primitive maps +
-  array-backed levels) — the fair fight, and the most instructive diff: how
-  much of the tail comes back, and what the code has to give up to get it.
-- Array-backed price ladder (dense ticks) replacing the tree maps in both.
+- **Zero-garbage Java and Go variants** (object pools, Agrona primitive maps
+  / preallocated slices, array-backed levels) — the fair fight, and the most
+  instructive diff: how much of the tail and throughput come back, and what
+  the code has to give up to get them.
+- Array-backed price ladder (dense ticks) replacing the tree maps everywhere.
 - Linux run with isolated, pinned cores; `perf`/dtrace flame graphs.
 - Journal + replay to demonstrate deterministic recovery (the other half of
   the LMAX story).

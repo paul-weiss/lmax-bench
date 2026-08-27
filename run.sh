@@ -7,6 +7,8 @@ echo "== building rust =="
 (cd rust && cargo build --release 2>&1 | tail -1)
 echo "== building java =="
 (cd java && mvn -q package)
+echo "== building go =="
+(cd go && go build -o clob-bench .)
 
 echo
 echo "==================== RUST ===================="
@@ -15,5 +17,8 @@ echo
 echo "==================== JAVA ===================="
 java -jar java/target/clob-bench-0.1.0.jar all
 echo
-echo "Checksums must match between the two runs; if they do, both engines"
+echo "==================== GO ======================"
+./go/clob-bench all
+echo
+echo "Checksums must match across all three runs; if they do, both engines"
 echo "processed a bit-identical workload identically."
