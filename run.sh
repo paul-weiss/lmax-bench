@@ -9,6 +9,8 @@ echo "== building java =="
 (cd java && mvn -q package)
 echo "== building go =="
 (cd go && go build -o clob-bench .)
+echo "== building c++ =="
+(cd cpp && make -s)
 
 echo
 echo "==================== RUST ===================="
@@ -20,5 +22,8 @@ echo
 echo "==================== GO ======================"
 ./go/clob-bench all
 echo
-echo "Checksums must match across all three runs; if they do, both engines"
+echo "==================== C++ ====================="
+./cpp/clob-bench all
+echo
+echo "Checksums must match across all four runs; if they do, both engines"
 echo "processed a bit-identical workload identically."

@@ -4,3 +4,4 @@ java/target/
 .DS_Store
 java/dependency-reduced-pom.xml
 go/clob-bench
+cpp/clob-bench
