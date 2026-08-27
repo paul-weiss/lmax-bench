@@ -251,6 +251,45 @@ paid at the boundary. Draining in strict sequence order is also what makes the
 book a deterministic fold over the event stream, which is what the
 cross-language checksum (and, in a real venue, replay recovery) relies on.
 
+### When the producer laps the ring: backpressure
+
+Sequences `s` and `s − N` map to the same slot, so the producer may never run
+more than N ahead of the slowest consumer — `claim()` enforces it:
+
+```
+claim(s):  wait until  s − consumer_cursor ≤ N     # else the slot still holds an unread event
+```
+
+That wait is visible verbatim in the hand-rolled rings (`go/main.go`'s
+`claim()` spins while `next − cons > N`; `cpp/main.cpp` likewise) and happens
+inside `RingBuffer.next()` / `publish()` in the Java and Rust libraries. With
+multiple consumers the producer gates on the *minimum* of their cursors — at
+LMAX the slowest of journaler, replicator, and unmarshaller set the wrap limit.
+
+A full bounded buffer only has three possible policies, and the choice is a
+design statement:
+
+1. **Drop / conflate** — right for market data (only the latest price
+   matters), catastrophic for orders: you cannot conflate a fill.
+2. **Buffer unboundedly** — hides overload as growing memory and latency until
+   it fails at the worst moment.
+3. **Backpressure — stall the producer** ← the Disruptor. Loss is impossible
+   by construction, and overload surfaces immediately at the boundary, where
+   the layer above can act on it (reject orders, throttle a client, shed).
+
+Two consequences: under saturation, publish latency honestly includes the wait
+(and the scheduled-time stamping keeps the histogram honest about it); and
+**ring size is the backpressure budget** — LMAX's 20-million-slot production
+input ring (vs 65,536 here, matching their published throughput tests) buys
+~3 seconds of burst absorption at 6M events/s before a slow downstream
+consumer stalls order intake. Sizing the ring is choosing how long a consumer
+may misbehave before the whole system feels it.
+
+In this benchmark, latency mode never approaches the wrap (the consumer trails
+by a slot or two); throughput mode lives at the ring's edge continuously —
+which is exactly why it measures the matching core's drain rate rather than
+the generator.
+
 - One producer, one consumer, busy-spin on both sides, ring size 65,536.
 - Transports: Java uses the original Disruptor (`BusySpinWaitStrategy`,
   `ProducerType.SINGLE`); Rust the `disruptor` crate (`BusySpin`); Go and C++
