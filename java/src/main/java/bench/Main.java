@@ -102,14 +102,23 @@ public final class Main {
         Resting(long price, long qty) { this.price = price; this.qty = qty; }
     }
 
-    static final class Book {
+    interface Engine {
+        void limit(byte side, long price, long qty, long id);
+        void cancel(long id);
+        long fills();
+        long volume();
+        int resting();
+        long checksum();
+    }
+
+    static final class Book implements Engine {
         final TreeMap<Long, ArrayDeque<Long>> bids = new TreeMap<>();
         final TreeMap<Long, ArrayDeque<Long>> asks = new TreeMap<>();
         final HashMap<Long, Resting> orders = new HashMap<>();
         long fills = 0;
         long volume = 0;
 
-        void limit(byte side, long price, long qty, long id) {
+        public void limit(byte side, long price, long qty, long id) {
             while (qty > 0) {
                 Map.Entry<Long, ArrayDeque<Long>> best =
                         side == SIDE_BID ? asks.firstEntry() : bids.lastEntry();
@@ -148,10 +157,14 @@ public final class Main {
             }
         }
 
-        void cancel(long id) { orders.remove(id); }
+        public void cancel(long id) { orders.remove(id); }
+
+        public long fills() { return fills; }
+        public long volume() { return volume; }
+        public int resting() { return orders.size(); }
 
         /** Deterministic checksum over live orders in (price, FIFO) order. */
-        long checksum() {
+        public long checksum() {
             long acc = 0;
             for (ArrayDeque<Long> level : bids.values()) acc = foldLevel(acc, level);
             for (ArrayDeque<Long> level : asks.values()) acc = foldLevel(acc, level);
@@ -169,6 +182,127 @@ public final class Main {
         }
     }
 
+    // ------------------------------------------------------------ tuned book
+    // Same semantics as Book (identical fills/volume/checksum on the same
+    // stream), engineered for the hot path in the Agrona spirit but with
+    // plain primitive arrays: dense array-backed price ladder with best
+    // pointers instead of a TreeMap, reusable long[]-FIFO levels, and — as
+    // order ids are dense sequential integers — the id map replaced by two
+    // preallocated long[] indexed by id (qty==0 marks dead). No boxing, no
+    // hashing, zero allocation in steady state: the GC never has to run.
+
+    static final int LADDER_LEN = 4096; // prices stay well inside [480, 1521]
+
+    static final class FlatLevel {
+        long[] ids = new long[16];
+        int head = 0, size = 0;
+
+        boolean isEmpty() { return head == size; }
+        void reset() { head = 0; size = 0; }
+        void push(long id) {
+            if (size == ids.length) ids = java.util.Arrays.copyOf(ids, size * 2);
+            ids[size++] = id;
+        }
+    }
+
+    static final class TunedBook implements Engine {
+        final FlatLevel[] bids = new FlatLevel[LADDER_LEN];
+        final FlatLevel[] asks = new FlatLevel[LADDER_LEN];
+        long bestBid = -1;
+        long bestAsk = LADDER_LEN; // sentinel: no asks
+        final long[] price;
+        final long[] qty; // 0 = dead
+        int live = 0;
+        long fills = 0;
+        long volume = 0;
+
+        TunedBook(long maxId) {
+            for (int i = 0; i < LADDER_LEN; i++) {
+                bids[i] = new FlatLevel();
+                asks[i] = new FlatLevel();
+            }
+            price = new long[(int) maxId + 2];
+            qty = new long[(int) maxId + 2];
+        }
+
+        public void limit(byte side, long px, long q, long id) {
+            while (q > 0) {
+                long best = (side == SIDE_BID) ? bestAsk : bestBid;
+                boolean crosses = (side == SIDE_BID) ? best <= px : best >= px;
+                if (best < 0 || best >= LADDER_LEN || !crosses) break;
+                FlatLevel lvl = (side == SIDE_BID) ? asks[(int) best] : bids[(int) best];
+                while (q > 0) {
+                    if (lvl.isEmpty()) break;
+                    long head = lvl.ids[lvl.head];
+                    if (qty[(int) head] == 0) { // lazily-cancelled order
+                        lvl.head++;
+                        continue;
+                    }
+                    long m = Math.min(q, qty[(int) head]);
+                    qty[(int) head] -= m;
+                    q -= m;
+                    fills++;
+                    volume += m;
+                    if (qty[(int) head] == 0) {
+                        live--;
+                        lvl.head++;
+                    }
+                }
+                if (lvl.isEmpty()) {
+                    lvl.reset();
+                    if (side == SIDE_BID) {
+                        long p = best + 1;
+                        while (p < LADDER_LEN && asks[(int) p].isEmpty()) p++;
+                        bestAsk = p;
+                    } else {
+                        long p = best - 1;
+                        while (p >= 0 && bids[(int) p].isEmpty()) p--;
+                        bestBid = p;
+                    }
+                }
+            }
+            if (q > 0) {
+                if (side == SIDE_BID) {
+                    bids[(int) px].push(id);
+                    bestBid = Math.max(bestBid, px);
+                } else {
+                    asks[(int) px].push(id);
+                    bestAsk = Math.min(bestAsk, px);
+                }
+                price[(int) id] = px;
+                qty[(int) id] = q;
+                live++;
+            }
+        }
+
+        public void cancel(long id) {
+            if (qty[(int) id] != 0) {
+                qty[(int) id] = 0;
+                live--;
+            }
+        }
+
+        public long fills() { return fills; }
+        public long volume() { return volume; }
+        public int resting() { return live; }
+
+        public long checksum() {
+            long acc = 0;
+            for (FlatLevel[] side : new FlatLevel[][] {bids, asks}) {
+                for (FlatLevel lvl : side) {
+                    for (int i = lvl.head; i < lvl.size; i++) {
+                        long id = lvl.ids[i];
+                        if (qty[(int) id] != 0) {
+                            acc = new SplitMix64(acc ^ id ^ (price[(int) id] << 20)
+                                    ^ qty[(int) id]).next();
+                        }
+                    }
+                }
+            }
+            return acc;
+        }
+    }
+
     // ------------------------------------------------------------ harness
 
     static final class Ev {
@@ -180,11 +314,14 @@ public final class Main {
     record Report(long fills, long volume, int resting, long checksum, Histogram hist) {}
 
     static final class CoreHandler implements EventHandler<Ev> {
-        final Book book = new Book();
+        final Engine book;
         final Histogram hist = new Histogram(60_000_000_000L, 3);
         final AtomicReference<Report> report;
 
-        CoreHandler(AtomicReference<Report> report) { this.report = report; }
+        CoreHandler(AtomicReference<Report> report, Engine book) {
+            this.report = report;
+            this.book = book;
+        }
 
         @Override
         public void onEvent(Ev e, long seq, boolean endOfBatch) {
@@ -193,7 +330,7 @@ public final class Main {
                 case KIND_CANCEL -> book.cancel(e.id);
                 default -> {
                     report.set(new Report(
-                            book.fills, book.volume, book.orders.size(),
+                            book.fills(), book.volume(), book.resting(),
                             book.checksum(), hist.copy()));
                     return;
                 }
@@ -210,10 +347,13 @@ public final class Main {
 
     static RunResult run(long totalOps, long warmupOps, long rate) {
         AtomicReference<Report> reportRef = new AtomicReference<>();
+        boolean tuned = "tuned".equals(System.getenv("ENGINE"));
+        System.out.printf("  engine=%s%n", tuned ? "tuned" : "idiomatic");
+        Engine engine = tuned ? new TunedBook(totalOps) : new Book();
         Disruptor<Ev> disruptor = new Disruptor<>(
                 Ev::new, RING_SIZE, DaemonThreadFactory.INSTANCE,
                 ProducerType.SINGLE, new BusySpinWaitStrategy());
-        disruptor.handleEventsWith(new CoreHandler(reportRef));
+        disruptor.handleEventsWith(new CoreHandler(reportRef, engine));
         disruptor.start();
         RingBuffer<Ev> rb = disruptor.getRingBuffer();
 

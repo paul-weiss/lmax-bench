@@ -123,18 +123,30 @@ physical P-cores):
 16.8–19.5M ops/s, Rust tuned 25.6–29.2M; C++ idiomatic 12.1–14.7M, C++ tuned
 15.9–16.4M.
 
-**Go and Java on the same Linux box** (idiomatic engines — no tuned variants
-exist for them yet; user-local Go 1.26 / Temurin JDK 22; "restricted" =
-`taskset` onto the same two P-cores the Rust/C++ pinned runs used):
+**Go and Java on the same Linux box** (user-local Go 1.26 / Temurin JDK 22;
+"restricted" = `taskset` onto the same two P-cores the Rust/C++ pinned runs
+used). Both languages also got tuned engines: the same array ladder and
+pooled level FIFOs, plus — because order ids are dense sequential integers —
+the id map replaced by two preallocated primitive arrays indexed by id
+(Agrona-spirit zero-garbage Java without the dependency; the same trick in
+Go). Checksums still match every other implementation:
 
 | config | p50 | p99 | p99.9 | p99.99 | max |
 |---|---:|---:|---:|---:|---:|
-| Go | 0.22 | 2.5 | 130 | 236 | 357 |
-| Go, restricted to 2 P-cores | 0.21 | 1.1 | 12.4 | 317 | 562 |
-| Java | 0.21 | 1.1 | 921 | 2,611 | 3,050 |
-| Java, restricted to 2 P-cores | 0.21 | **799** | **7,631** | 9,421 | 9,986 |
+| Go idiomatic | 0.22 | 2.5 | 130 | 236 | 357 |
+| Go idiomatic, restricted | 0.21 | 1.1 | 12.4 | 317 | 562 |
+| Go tuned | 0.18 | 2.0 | 110 | 172 | 247 |
+| **Go tuned, restricted** | 0.19 | 0.55 | **3.3** | **67.6** | **160** |
+| Java idiomatic | 0.21 | 1.1 | 921 | 2,611 | 3,050 |
+| Java idiomatic, restricted | 0.21 | **799** | **7,631** | 9,421 | 9,986 |
+| **Java tuned** | 0.20 | 0.34 | **2.6** | **63.0** | **149** |
+| Java tuned, restricted | 0.19 | 1.0 | 1,433 | 3,152 | 3,482 |
 
-Throughput on Linux: Go 11.3M ops/s (double its macOS number), Java 10.2M.
+Throughput on Linux: Go idiomatic 11.3M ops/s (double its macOS number), Go
+tuned 13.3M; Java idiomatic 10.2M, **Java tuned 24.9–33.8M — overlapping
+with, and sometimes beating, tuned Rust's 28.4–29.6M**. The Java tuned
+latency runs report **zero GC collections**: with nothing allocated, the
+collector never runs, and the GC tail simply does not exist.
 
 ### What Round 2 shows
 
@@ -166,7 +178,15 @@ Throughput on Linux: Go 11.3M ops/s (double its macOS number), Java 10.2M.
    measured ops** (Rust, tuned, pinned) — four orders of magnitude below
    where idiomatic Java on macOS started, with the algorithm and workload
    bit-identical throughout.
-7. **Pinning a GC'd runtime without budgeting cores for the collector is a
+7. **The LMAX thesis, reproduced.** Zero-garbage Java (primitive arrays, no
+   boxing, no steady-state allocation) went from p99.9 = 921 µs to
+   **2.6 µs** and from 10.2M to **~30M ops/s — the fastest throughput of any
+   configuration in the study**, trading blows with tuned Rust. C2 compiles
+   allocation-free primitive-array code superbly; Java was never slow — its
+   *idioms* were. The cost is that the tuned code no longer looks like Java
+   anyone would write by default, which is exactly what LMAX engineers have
+   said for fifteen years.
+8. **Pinning a GC'd runtime without budgeting cores for the collector is a
    disaster.** Restricting the Java process to the same two P-cores the
    Rust/C++ runs were pinned to — so the two busy-spin threads starve G1's
    collector and the JIT — inflated p99 to ~800 µs and p99.9 to 7.6 ms,
@@ -174,7 +194,7 @@ Throughput on Linux: Go 11.3M ops/s (double its macOS number), Java 10.2M.
    more gracefully (its p99.9 actually improved to 12 µs, with a modestly
    worse extreme tail). Affinity plans must count the runtime's helper
    threads, not just your own.
-8. **Idiomatic Rust vs Go on Linux is a crossover, not a ranking.** Rust
+9. **Idiomatic Rust vs Go on Linux is a crossover, not a ranking.** Rust
    idiomatic wins p99.9 (4 µs vs 130 µs); Go wins p99.99 (236 µs vs 1.8 ms,
    its concurrent GC never producing the allocator's rare multi-ms stall).
    Which one is "better" depends on which percentile your SLA is written
@@ -274,9 +294,8 @@ Or all four, back to back, via `./run.sh`.
 
 ## Future work
 
-- **Zero-garbage Java and Go variants** (object pools, Agrona primitive
-  maps / preallocated slices) — done for Rust and C++ in Round 2; the GC
-  languages are the remaining, and most instructive, half of that experiment.
+- Agrona-based Java variant (the production-grade version of the primitive-
+  array approach) and a `GOGC=off` Go run for completeness.
 - Linux with `isolcpus`/`nohz_full` (true isolation, not just affinity);
   `perf` flame graphs of the remaining tuned-engine tail.
 - Journal + replay to demonstrate deterministic recovery (the other half of
