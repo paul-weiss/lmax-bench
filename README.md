@@ -340,6 +340,25 @@ per-symbol partitioning across engine instances, throttles and kill
 switches, and above all **journaling with replicated replay for failover**
 (the Aeron Cluster pattern — see Future work).
 
+### Code layout
+
+Each implementation is split along the LMAX architecture's seams — the same
+component names in every language:
+
+| component | role (LMAX analog) | Java | Rust | Go | C++ |
+|---|---|---|---|---|---|
+| workload | deterministic input gen (the gateway feed) | `SplitMix64` + `Workload` | `workload.rs` | `workload.go` | `workload.hpp` |
+| book | idiomatic business-logic state | `Book`, `Resting`, `Engine` | `book.rs` | `book.go` | `book.hpp` |
+| tuned book | the low-allocation engine | `TunedBook`, `FlatLevel` | `tuned.rs` | `tuned.go` | `tuned.hpp` |
+| ring | the transport | com.lmax.disruptor (library) | `disruptor` crate (library) | `ring.go` | `ring.hpp` |
+| event + handler | what flows, and the single-writer core | `Ev`, `CoreHandler` | `harness.rs` | `harness.go` | `main.cpp` |
+| harness | modes, pacing, histograms, reporting | `Harness`, `Report`, `Main` | `harness.rs`, `main.rs` | `harness.go`, `main.go` | `main.cpp` |
+
+Java and Rust get their ring from the respective Disruptor libraries; Go and
+C++ carry theirs in-tree (`ring.go`, `ring.hpp`) since neither has a canonical
+one — which also makes those two files the place to read the pattern's ~40
+essential lines.
+
 ### The same algorithm, four spellings — per-language implementation notes
 
 The matching loop is line-for-line the same algorithm everywhere (the checksums
