@@ -340,6 +340,102 @@ per-symbol partitioning across engine instances, throttles and kill
 switches, and above all **journaling with replicated replay for failover**
 (the Aeron Cluster pattern — see Future work).
 
+### The same algorithm, four spellings — per-language implementation notes
+
+The matching loop is line-for-line the same algorithm everywhere (the checksums
+prove it). What differs is what each language makes you *say* to express it —
+and each difference is a small lesson about that runtime.
+
+**Java** (`java/src/main/java/bench/Main.java`)
+
+```java
+TreeMap<Long, ArrayDeque<Long>> bids, asks;   // price -> FIFO of order ids
+HashMap<Long, Resting> orders;                // id -> (price, qty)
+```
+
+- Best level is one call: `asks.firstEntry()` / `bids.lastEntry()` — the
+  red-black `TreeMap` hands you either end, with price and queue in one entry.
+- A partial fill mutates the shared `Resting` object through its reference —
+  no write-back, the map holds the same object.
+- Resting an order is `computeIfAbsent(price, p -> new ArrayDeque<>()).addLast(id)`
+  — idiomatic, and the allocation story in miniature: an object per resting
+  order, a boxed `Long` for every id that crosses a collection boundary, a tree
+  node per price level. The JIT makes the *logic* as fast as anyone's (identical
+  p50); this allocation profile is what idiomatic style costs, and it is exactly
+  what the tuned `TunedBook` (primitive `long[]` everywhere) deletes.
+
+**Rust** (`rust/src/main.rs`)
+
+```rust
+bids: BTreeMap<i64, VecDeque<u64>>, asks: BTreeMap<i64, VecDeque<u64>>,
+orders: HashMap<u64, Resting>,     // Resting stored BY VALUE, 16 bytes inline
+```
+
+- Best level: `iter_mut().next()` / `next_back()`, with the cross test and the
+  `(price, level)` binding done in one `match` guard.
+- The shape the borrow checker forces is the interesting part: the inner loop
+  holds `level: &mut VecDeque` borrowed out of one field while calling
+  `self.orders.get_mut(..)` on another. That compiles only because they are
+  *disjoint fields* of `Book` — and that is not an inconvenience, it is the
+  compiler enforcing exactly the one-mutator-per-structure discipline a matching
+  engine wants anyway.
+- `Resting` lives by value inside the map — no per-order heap box at all, one
+  reason idiomatic Rust allocates ~18x less than idiomatic C++ here (BTreeMap's
+  many-entries-per-node layout is the other).
+
+**Go** (`go/main.go`)
+
+```go
+bidPrices, askPrices *btree.BTreeG[int64]   // ordered prices only
+bidLevels, askLevels map[int64]*level       // price -> FIFO
+orders map[uint64]resting                   // VALUE type
+```
+
+- Two structures where the others have one: the stdlib has no ordered map, and
+  `google/btree` orders *keys*, so prices live in the btree and level bodies in
+  a hash map — two lookups per best-level, and the two must be kept in sync by
+  hand on level create and level removal.
+- The value-semantics gotcha: `rec := b.orders[head]` returns a **copy**. After
+  `rec.qty -= m` you must write it back (`b.orders[head] = rec`) or the fill
+  silently doesn't happen — Go forbids taking the address of a map element. The
+  upside is no per-order heap object; the trap is that forgetting the write-back
+  still compiles. The checksum tests are what make this safe to touch.
+
+**C++** (`cpp/main.cpp`)
+
+```cpp
+std::map<int64_t, std::deque<uint64_t>> bids, asks;
+std::unordered_map<uint64_t, Resting> orders;
+```
+
+- Best ask is `asks.begin()`; best bid is `std::prev(bids.end())` — guarded by
+  an `empty()` check first, because `prev(end())` on an empty map is undefined
+  behavior. `std::map` has no `lastEntry()`.
+- `auto& lvl = it->second` stays valid through the whole inner loop because
+  node-based `std::map` never invalidates references on other keys' operations —
+  and erasing the emptied level by iterator is the one moment after which `it`
+  and `lvl` must never be touched again. In the other three languages those
+  lifetime rules are enforced (GC or borrow checker); here they are a
+  code-review obligation.
+- The throughput surprise lives here: a heap node per price level and a chunk
+  per deque block — 5.5M inline mallocs per 10M ops, each paid retail, which is
+  how idiomatic C++ loses to Java's bump-pointer allocation on throughput while
+  beating it on tail.
+
+**Summary**
+
+| concern | Java | Rust | Go | C++ |
+|---|---|---|---|---|
+| best level | `firstEntry`/`lastEntry` | `iter_mut().next{_back}()` | `btree.Min/Max` + map lookup | `begin()` / `prev(end())` |
+| partial fill | mutate shared object | `get_mut`, in place | copy, mutate, **write back** | mutate via iterator |
+| per-order cost | boxed key + object | 16 B by value, inline | value in map, no box | entry in node/bucket |
+| what the language enforces | nothing (GC forgives) | aliasing, via disjoint-field borrows | nothing (write-back is on you) | nothing (iterator rules are on you) |
+
+The tuned engines erase most of these differences on purpose — dense array
+ladder, pooled level FIFOs, id-indexed or reserved maps in every language — which
+is how a ~450x idiomatic spread at p99.99 compresses to ~5x: once allocation is
+out of the hot path, what remains is runtime character, not language identity.
+
 ### The workload
 
 Deterministic, generated by splitmix64 implemented identically in all four
