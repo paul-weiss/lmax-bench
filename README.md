@@ -222,19 +222,45 @@ producer thread                    consumer thread (single writer)
   concurrent data structures. Determinism is a design property, which is what
   makes the cross-language checksum possible at all.
 
-### The matching engine ("a known algorithm")
+### The matching engine — a CLOB
 
-Price-time priority continuous limit-order-book matching:
+The "known algorithm" here is a **central limit order book**: the core
+mechanism of essentially every modern exchange. All resting limit orders for
+an instrument are organized as two sides (bids and asks) of **price levels**,
+orders queued **first-in-first-out within each level**. An incoming order
+matches against the best opposite price first (*price priority*), oldest
+order first at that price (*time priority*); whatever doesn't match rests in
+the book and becomes the liquidity the next arrival trades against.
+Price-time priority is what "the matching algorithm" means at most equity,
+futures, and crypto venues.
 
-- Two sides of price levels in each language's idiomatic ordered map (Java
-  `TreeMap`, Rust `BTreeMap`, Go `google/btree` — the stdlib has none — and
-  C++ `std::map`), each level a FIFO queue of order ids; an id→order hash map
-  for O(1) cancel.
-- An incoming limit order sweeps crossing opposite levels best-first, FIFO
-  within a level; any residual rests.
-- Cancels are **lazy**: removal from the id map only; dead ids are skipped when
-  they surface at the head of a queue (a standard real-world technique —
-  cancel-heavy flow makes eager level surgery expensive).
+How each CLOB concept maps onto this code:
+
+| CLOB concept | Where it is here |
+|---|---|
+| The book (two sides of price levels) | Ordered maps in the idiomatic engines (Java `TreeMap`, Rust `BTreeMap`, Go `google/btree` — the stdlib has none — C++ `std::map`); the dense array **price ladder** in the tuned engines |
+| Time priority within a level | The FIFO queue per level (deque → slice-with-head-index) |
+| Price priority / best bid-offer | Tree min/max → the `best_bid`/`best_ask` pointers |
+| An aggressive order sweeping the book | The nested matching loop: cross the best level, FIFO through it, advance to the next level |
+| Partial fills and resting residuals | Quantity decrement; residual inserted at its price level |
+| Cancels (the bulk of real exchange flow) | **Lazy cancellation**: the id is removed from the id map only; dead ids are skipped when they surface at a queue head — a real production technique, because cancel-heavy flow makes eager level surgery expensive |
+| The exchange's input pipeline | The ring buffer + single-writer thread — the LMAX architecture, which is how production matching engines are actually hosted |
+| Deterministic matching (a regulatory and failover requirement at real venues) | The design property this repo exploits for the cross-language checksum |
+
+So a benchmark "op" is an order-book operation — an insert, match, or cancel
+against a live book holding hundreds of thousands of resting orders — and
+the latency percentiles are literally "how long the matching engine takes to
+process an order."
+
+**What a production CLOB adds that this one deliberately omits**, so the
+scope is honest: more order types (market, IOC/FOK, stop, iceberg/hidden),
+cancel-*replace* with its queue-priority rules, self-trade prevention,
+pre-trade risk checks (price bands, fat-finger and credit limits),
+**market-data publication** (every book change fanned out as an L2/L3 feed —
+often half the engineering of a real venue), opening/closing auctions,
+per-symbol partitioning across engine instances, throttles and kill
+switches, and above all **journaling with replicated replay for failover**
+(the Aeron Cluster pattern — see Future work).
 
 ### The workload
 
