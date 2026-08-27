@@ -123,6 +123,19 @@ physical P-cores):
 16.8–19.5M ops/s, Rust tuned 25.6–29.2M; C++ idiomatic 12.1–14.7M, C++ tuned
 15.9–16.4M.
 
+**Go and Java on the same Linux box** (idiomatic engines — no tuned variants
+exist for them yet; user-local Go 1.26 / Temurin JDK 22; "restricted" =
+`taskset` onto the same two P-cores the Rust/C++ pinned runs used):
+
+| config | p50 | p99 | p99.9 | p99.99 | max |
+|---|---:|---:|---:|---:|---:|
+| Go | 0.22 | 2.5 | 130 | 236 | 357 |
+| Go, restricted to 2 P-cores | 0.21 | 1.1 | 12.4 | 317 | 562 |
+| Java | 0.21 | 1.1 | 921 | 2,611 | 3,050 |
+| Java, restricted to 2 P-cores | 0.21 | **799** | **7,631** | 9,421 | 9,986 |
+
+Throughput on Linux: Go 11.3M ops/s (double its macOS number), Java 10.2M.
+
 ### What Round 2 shows
 
 1. **Round 1's diagnosis was wrong — the "OS tail" was mostly the
@@ -153,6 +166,20 @@ physical P-cores):
    measured ops** (Rust, tuned, pinned) — four orders of magnitude below
    where idiomatic Java on macOS started, with the algorithm and workload
    bit-identical throughout.
+7. **Pinning a GC'd runtime without budgeting cores for the collector is a
+   disaster.** Restricting the Java process to the same two P-cores the
+   Rust/C++ runs were pinned to — so the two busy-spin threads starve G1's
+   collector and the JIT — inflated p99 to ~800 µs and p99.9 to 7.6 ms,
+   several times *worse* than unrestricted. Go took the same restriction far
+   more gracefully (its p99.9 actually improved to 12 µs, with a modestly
+   worse extreme tail). Affinity plans must count the runtime's helper
+   threads, not just your own.
+8. **Idiomatic Rust vs Go on Linux is a crossover, not a ranking.** Rust
+   idiomatic wins p99.9 (4 µs vs 130 µs); Go wins p99.99 (236 µs vs 1.8 ms,
+   its concurrent GC never producing the allocator's rare multi-ms stall).
+   Which one is "better" depends on which percentile your SLA is written
+   against — until you remove allocation from the hot path, at which point
+   tuned Rust/C++ beat everything at every percentile.
 
 ## Architecture
 
