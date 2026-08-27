@@ -210,38 +210,38 @@ All four are the same shape — the LMAX pattern:
 The whole program, as pseudocode — the ring buffer is the delivery mechanism,
 the matching algorithm is the payload of one arm of the consumer's switch:
 
-```
+```python
 # ============ PRODUCER THREAD ============
-loop:
-    op = next_operation()                  # splitmix64 workload gen
-    slot = ring.claim()                    # spins only if the ring is full
-    write op into slot, in place           # slot is pre-allocated — no allocation, ever
-    ring.publish()                         # advance producer cursor (release store)
+while True:
+    op = next_operation()                   # splitmix64 workload gen
+    slot = ring.claim()                     # spins only if the ring is full
+    slot.write(op)                          # in place — the slot is pre-allocated; no allocation, ever
+    ring.publish()                          # advance the producer cursor (release store)
 
-# ============ CONSUMER THREAD (single writer — owns ALL book state) ============
+# ============ CONSUMER THREAD — single writer, owns ALL book state ============
 seq = 0
-loop:
-    spin until producer_cursor > seq       # busy-wait (acquire load)
+while True:
+    while producer_cursor <= seq: spin()    # busy-wait (acquire load)
     seq += 1
-    e = ring[seq mod N]                    # N is a power of two: computed as seq & (N-1)
-    case e.kind:
-        LIMIT  -> limit(e)                 # the matching algorithm, below
-        CANCEL -> cancel(e.id)             # remove from id map only (lazy)
-    consumer_cursor = seq                  # frees the slot for reuse
+    e = ring[seq % N]                       # N is a power of two: computed as seq & (N-1)
+    match e.kind:
+        case LIMIT:  limit(e)               # the matching algorithm, below
+        case CANCEL: cancel(e.id)           # remove from the id map only (lazy)
+    consumer_cursor = seq                   # frees the slot for reuse
 
 # ============ limit(e) — price-time priority matching ============
 while e.qty > 0:
-    level = best opposite price level      # lowest ask for a buy, highest bid for a sell
-    if no level, or it does not cross e.price: break
-    while e.qty > 0 and level not empty:
-        head = oldest order id at level    # FIFO = time priority
-        if head not in id map:             # lazily-cancelled tombstone
-            pop head; continue
+    level = best_opposite_level()           # lowest ask for a buy, highest bid for a sell
+    if level is None or not crosses(level.price, e.price): break
+    while e.qty > 0 and not level.empty():
+        head = level.front()                # oldest order at this price: FIFO = time priority
+        if head not in id_map:              # lazily-cancelled tombstone
+            level.pop_front(); continue
         fill = min(e.qty, head.qty)
-        head.qty -= fill; e.qty -= fill    # partial fill stays AT THE HEAD (keeps priority)
-        if head.qty == 0: remove from id map; pop head
-    if level is empty: remove the level    # tuned engines: advance the best pointer
-if e.qty > 0: append e.id to the FIFO at e.price; insert into id map    # rest the residual
+        head.qty -= fill; e.qty -= fill     # a partial fill stays AT THE HEAD (keeps its priority)
+        if head.qty == 0: id_map.remove(head); level.pop_front()
+    if level.empty(): remove_level(level)   # tuned engines: advance the best pointer instead
+if e.qty > 0: rest(e)                       # append to the FIFO at e.price; insert into the id map
 ```
 
 Note what is absent from `limit()`: locks, atomics, defensive copies. The ring's
