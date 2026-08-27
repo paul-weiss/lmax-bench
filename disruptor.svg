@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 620" font-family="Helvetica Neue, Helvetica, Arial, sans-serif">
+  <rect width="980" height="620" fill="#ffffff"/>
+  <text x="490" y="42" text-anchor="middle" font-size="24" font-weight="700" fill="#20242a">The LMAX Disruptor</text>
+  <text x="490" y="66" text-anchor="middle" font-size="14" fill="#5b6570">single-producer / single-consumer configuration, as used in lmax-bench</text>
+
+  <path d="M 434.6 135.1 A 165 165 0 0 1 488.9 145.9 L 466.4 204.7 A 102 102 0 0 0 432.8 198.0 Z" fill="#dfe3e8" stroke="#ffffff" stroke-width="1"/><path d="M 497.4 149.4 A 165 165 0 0 1 543.4 180.1 L 500.1 225.9 A 102 102 0 0 0 471.6 206.9 Z" fill="#dfe3e8" stroke="#ffffff" stroke-width="1"/><path d="M 549.9 186.6 A 165 165 0 0 1 580.6 232.6 L 523.1 258.4 A 102 102 0 0 0 504.1 229.9 Z" fill="#dfe3e8" stroke="#ffffff" stroke-width="1"/><path d="M 584.1 241.1 A 165 165 0 0 1 594.9 295.4 L 532.0 297.2 A 102 102 0 0 0 525.3 263.6 Z" fill="#dfe3e8" stroke="#ffffff" stroke-width="1"/><path d="M 594.9 304.6 A 165 165 0 0 1 584.1 358.9 L 525.3 336.4 A 102 102 0 0 0 532.0 302.8 Z" fill="#1b9e8f" stroke="#ffffff" stroke-width="1"/><path d="M 580.6 367.4 A 165 165 0 0 1 549.9 413.4 L 504.1 370.1 A 102 102 0 0 0 523.1 341.6 Z" fill="#1b9e8f" stroke="#ffffff" stroke-width="1"/><path d="M 543.4 419.9 A 165 165 0 0 1 497.4 450.6 L 471.6 393.1 A 102 102 0 0 0 500.1 374.1 Z" fill="#1b9e8f" stroke="#ffffff" stroke-width="1"/><path d="M 488.9 454.1 A 165 165 0 0 1 434.6 464.9 L 432.8 402.0 A 102 102 0 0 0 466.4 395.3 Z" fill="#1b9e8f" stroke="#ffffff" stroke-width="1"/><path d="M 425.4 464.9 A 165 165 0 0 1 371.1 454.1 L 393.6 395.3 A 102 102 0 0 0 427.2 402.0 Z" fill="#1b9e8f" stroke="#ffffff" stroke-width="1"/><path d="M 362.6 450.6 A 165 165 0 0 1 316.6 419.9 L 359.9 374.1 A 102 102 0 0 0 388.4 393.1 Z" fill="#1b9e8f" stroke="#ffffff" stroke-width="1"/><path d="M 310.1 413.4 A 165 165 0 0 1 279.4 367.4 L 336.9 341.6 A 102 102 0 0 0 355.9 370.1 Z" fill="#1b9e8f" stroke="#ffffff" stroke-width="1"/><path d="M 275.9 358.9 A 165 165 0 0 1 265.1 304.6 L 328.0 302.8 A 102 102 0 0 0 334.7 336.4 Z" fill="#1b9e8f" stroke="#ffffff" stroke-width="1"/><path d="M 265.1 295.4 A 165 165 0 0 1 275.9 241.1 L 334.7 263.6 A 102 102 0 0 0 328.0 297.2 Z" fill="#e8833a" stroke="#ffffff" stroke-width="1"/><path d="M 279.4 232.6 A 165 165 0 0 1 310.1 186.6 L 355.9 229.9 A 102 102 0 0 0 336.9 258.4 Z" fill="#dfe3e8" stroke="#ffffff" stroke-width="1"/><path d="M 316.6 180.1 A 165 165 0 0 1 362.6 149.4 L 388.4 206.9 A 102 102 0 0 0 359.9 225.9 Z" fill="#dfe3e8" stroke="#ffffff" stroke-width="1"/><path d="M 371.1 145.9 A 165 165 0 0 1 425.4 135.1 L 427.2 198.0 A 102 102 0 0 0 393.6 204.7 Z" fill="#dfe3e8" stroke="#ffffff" stroke-width="1"/>
+  <text x="561" y="330" text-anchor="middle" font-size="11" fill="#ffffff" font-family="ui-monospace,Menlo,monospace">419</text><text x="541" y="378" text-anchor="middle" font-size="11" fill="#ffffff" font-family="ui-monospace,Menlo,monospace">420</text><text x="504" y="415" text-anchor="middle" font-size="11" fill="#ffffff" font-family="ui-monospace,Menlo,monospace">421</text><text x="456" y="435" text-anchor="middle" font-size="11" fill="#ffffff" font-family="ui-monospace,Menlo,monospace">422</text><text x="404" y="435" text-anchor="middle" font-size="11" fill="#ffffff" font-family="ui-monospace,Menlo,monospace">423</text><text x="356" y="415" text-anchor="middle" font-size="11" fill="#ffffff" font-family="ui-monospace,Menlo,monospace">424</text><text x="319" y="378" text-anchor="middle" font-size="11" fill="#ffffff" font-family="ui-monospace,Menlo,monospace">425</text><text x="299" y="330" text-anchor="middle" font-size="11" fill="#ffffff" font-family="ui-monospace,Menlo,monospace">426</text><text x="299" y="278" text-anchor="middle" font-size="11" fill="#ffffff" font-family="ui-monospace,Menlo,monospace">427</text>
+  <text x="430" y="286" text-anchor="middle" font-size="15" font-weight="600" fill="#20242a">ring buffer</text>
+  <text x="430" y="306" text-anchor="middle" font-size="12" fill="#5b6570">65,536 pre-allocated</text>
+  <text x="430" y="322" text-anchor="middle" font-size="12" fill="#5b6570">event slots</text>
+  <text x="430" y="344" text-anchor="middle" font-size="11" font-family="ui-monospace,Menlo,monospace" fill="#5b6570">index = seq &amp; (N-1)</text>
+
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#20242a"/>
+    </marker>
+    <marker id="arrO" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#e8833a"/>
+    </marker>
+    <marker id="arrT" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#1b9e8f"/>
+    </marker>
+  </defs>
+
+  <!-- producer (left) -->
+  <rect x="30" y="96" width="204" height="96" rx="10" fill="#f4f6f8" stroke="#c9d0d8"/>
+  <text x="132" y="126" text-anchor="middle" font-size="15" font-weight="600" fill="#20242a">Producer thread</text>
+  <text x="132" y="148" text-anchor="middle" font-size="12" fill="#5b6570">workload generator</text>
+  <text x="132" y="166" text-anchor="middle" font-size="12" fill="#5b6570">claim &#8594; write in place &#8594; publish</text>
+  <path d="M 170 192 C 200 226 220 240 252 258" stroke="#20242a" stroke-width="2" fill="none" marker-end="url(#arr)"/>
+
+  <line x1="219" y1="258" x2="260" y2="266" stroke="#e8833a" stroke-width="2.5" marker-end="url(#arrO)"/>
+  <text x="215" y="278" text-anchor="end" font-size="12" font-weight="600" fill="#e8833a">producer cursor</text>
+  <text x="215" y="294" text-anchor="end" font-size="11" fill="#5b6570">claims the next slot; waits</text>
+  <text x="215" y="309" text-anchor="end" font-size="11" fill="#5b6570">only when the ring is full</text>
+
+  <!-- consumer (right) -->
+  <rect x="746" y="96" width="204" height="112" rx="10" fill="#f4f6f8" stroke="#c9d0d8"/>
+  <text x="848" y="126" text-anchor="middle" font-size="15" font-weight="600" fill="#20242a">Consumer thread</text>
+  <text x="848" y="148" text-anchor="middle" font-size="12" fill="#5b6570">single-writer matching core</text>
+  <text x="848" y="166" text-anchor="middle" font-size="12" fill="#5b6570">owns ALL book state</text>
+  <text x="848" y="184" text-anchor="middle" font-size="12" fill="#5b6570">no locks anywhere</text>
+  <path d="M 610 250 C 660 218 700 200 746 186" stroke="#20242a" stroke-width="2" fill="none" marker-end="url(#arr)"/>
+
+  <line x1="641" y1="342" x2="600" y2="334" stroke="#1b9e8f" stroke-width="2.5" marker-end="url(#arrT)"/>
+  <text x="647" y="362" font-size="12" font-weight="600" fill="#1b9e8f">consumer cursor</text>
+  <text x="647" y="378" font-size="11" fill="#5b6570">busy-spins until the producer</text>
+  <text x="647" y="393" font-size="11" fill="#5b6570">cursor moves ahead, then</text>
+  <text x="647" y="408" font-size="11" fill="#5b6570">drains the batch in order</text>
+
+  <!-- legend -->
+  <g transform="translate(60,505)">
+    <rect x="0" y="0" width="16" height="16" rx="3" fill="#1b9e8f"/>
+    <text x="24" y="13" font-size="12.5" fill="#20242a">published — written, awaiting the consumer (sequence numbers shown)</text>
+    <rect x="0" y="26" width="16" height="16" rx="3" fill="#e8833a"/>
+    <text x="24" y="39" font-size="12.5" fill="#20242a">claimed — producer writing the next event in place</text>
+    <rect x="0" y="52" width="16" height="16" rx="3" fill="#dfe3e8"/>
+    <text x="24" y="65" font-size="12.5" fill="#20242a">free — already consumed; the slot (and its event object) is reused, never freed</text>
+  </g>
+
+  <g transform="translate(660,478)">
+    <text x="0" y="0" font-size="13" font-weight="700" fill="#20242a">Why it beats a locked queue</text>
+    <text x="0" y="22" font-size="12" fill="#5b6570">&#8226; one writer per cursor &#8594; no contention, no locks</text>
+    <text x="0" y="41" font-size="12" fill="#5b6570">&#8226; cursors on separate cache lines &#8594; no false sharing</text>
+    <text x="0" y="60" font-size="12" fill="#5b6570">&#8226; slots pre-allocated once &#8594; zero steady-state garbage</text>
+    <text x="0" y="79" font-size="12" fill="#5b6570">&#8226; sequential slot access &#8594; the prefetcher does the work</text>
+    <text x="0" y="98" font-size="12" fill="#5b6570">&#8226; contiguous batches &#8594; amortized memory barriers</text>
+  </g>
+</svg>

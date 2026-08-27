@@ -203,14 +203,9 @@ collector never runs, and the GC tail simply does not exist.
 
 ## Architecture
 
-All three are the same shape — the LMAX pattern:
+All four are the same shape — the LMAX pattern:
 
-```
-producer thread                    consumer thread (single writer)
-  workload gen (splitmix64)   →      matching core owns ALL state
-  publish into ring buffer    →      price-time priority book
-  (busy-spin wait strategy)          fills/cancels, HdrHistogram
-```
+![The LMAX Disruptor — single-producer/single-consumer ring buffer between the workload producer and the single-writer matching core](disruptor.svg)
 
 - One producer, one consumer, busy-spin on both sides, ring size 65,536.
 - Transports: Java uses the original Disruptor (`BusySpinWaitStrategy`,
