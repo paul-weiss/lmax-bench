@@ -1,0 +1,8 @@
+[package]
+name = "clob-bench"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+disruptor = "4.4.0"
+hdrhistogram = "7.6.0"

@@ -1,0 +1,5 @@
+rust/target/
+java/target/
+*.log
+.DS_Store
+java/dependency-reduced-pom.xml
