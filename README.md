@@ -10,37 +10,14 @@ head-to-head on a bit-identical workload.
 
 The interesting result is not "Rust is fastest" (it is, at the median and in
 throughput). It's that **each runtime puts its latency somewhere different**:
-Java allocates fast and pays in the tail (GC); Go pays at the median and in
-throughput but keeps a remarkably tight tail (concurrent sub-ms GC); C++ pays
-malloc inline on every node — deterministic, but enough to lose to *Java* on
-throughput — and shares Rust's OS-bound tail; Rust pays the least everywhere,
-until the OS scheduler becomes its tail. In trading systems the tail is the
-story.
-
-## Results (Apple M1 Max, macOS, out of the box — see Methodology)
-
-**Throughput** (10M ops, producer publishing as fast as the ring accepts;
-ranges across repeated runs):
-
-| | Java (disruptor 4.0) | Rust (disruptor 4.4) | Go (SPSC ring) | C++ (SPSC ring) |
-|---|---:|---:|---:|---:|
-| ops/s | 8.0–8.8M | 13.1–14.5M | 5.7–6.9M | 7.4–8.3M |
-| GC | 8–9 collections, 41–48 ms pause | — | 13 cycles, **1.2 ms** total STW | — |
-| heap allocations | (boxed keys, order objects) | 310,882 | 567,939 | **5,537,674** |
-
-**Latency** (2M ops paced at 250k ops/s, publish→processed, HdrHistogram,
-scheduled-time stamping to avoid coordinated omission). All values in
-**microseconds**; each cell is the range observed across four runs, because on
-an un-isolated desktop the run-to-run spread *is* part of the result:
-
-| percentile | Java (µs) | Rust (µs) | Go (µs) | C++ (µs) |
-|---|---:|---:|---:|---:|
-| p50 | 0.25 – 0.42 | 0.17 – 0.29 | 0.33 – 0.50 | 0.21 – 0.25 |
-| p90 | 0.67 – 0.79 | 0.54 – 0.58 | 0.71 – 0.83 | 0.63 – 0.71 |
-| p99 | 6.6 – 440 | 3.5 – 13.3 | 3.6 – 14.8 | 4.0 – 4.4 |
-| p99.9 | **1,674 – 8,208** | 37 – 3,070 | **29 – 48** | 24 – 56 |
-| p99.99 | 4,018 – 13,509 | 2,204 – 8,294 | **79 – 179** | 1,752 – 1,907 |
-| max | 4,481 – 14,017 | 2,806 – 8,897 | 165 – 744 | 2,377 – 2,530 |
+Java's idiomatic collections allocate fast and pay in the tail (GC); Go pays
+at the median and in throughput but keeps a remarkably tight tail (concurrent
+sub-ms GC); C++ pays malloc inline on every node — deterministic, but enough
+to lose to *Java* on throughput. And the biggest lever turns out to be
+allocation discipline, not language: once the tuned zero-allocation engines
+remove the hot-path allocator, a ~450x cross-language spread at p99.99
+compresses to ~5x — with zero-garbage Java trading blows with tuned Rust. In
+trading systems the tail is the story.
 
 Every run of every implementation prints a deterministic checksum of the final
 book plus fill/volume counts — and **all four languages produce the same
@@ -48,50 +25,10 @@ checksum on the same workload**, proving they processed a bit-identical
 operation stream through identical matching logic. This is what makes the
 comparison meaningful.
 
-## What this shows
+## Results — Linux, pinned cores, and tuned engines (Round 2)
 
-1. **The architecture, not the language, sets the median.** A single-writer
-   core behind a ring buffer processes an order in a few hundred nanoseconds
-   in all three languages. If p50 is what you care about, any of them is
-   already there.
-2. **Java's tail is GC-bound and reproduces every run.** p99.9 in the
-   milliseconds, every time, tracking the collection counters one-for-one.
-   The idiomatic-collections book (`TreeMap<Long, ArrayDeque<Long>>`, boxed
-   `Long`s, an object per resting order) produces steady garbage, and G1's
-   pauses land in the distribution exactly where trading systems can least
-   afford them.
-3. **Go is the surprise: the tightest, most reproducible tail of the three.**
-   Its collector is *designed* for this — fully concurrent marking with
-   sub-millisecond stop-the-world phases (1.2 ms total across 13 cycles here,
-   vs Java's 41–48 ms across 9). The GC runs, constantly, and barely shows at
-   p99.99. The price appears elsewhere: the lowest throughput (write barriers,
-   allocation cost, no free lunch) and a slightly higher median. **GC design
-   matters more than GC presence.**
-4. **Rust has the best median and throughput, and its tail belongs to the
-   OS.** With no collector, what's left at p99.9+ is scheduler preemption and
-   core migration — which on an unpinned macOS desktop swings its tail from
-   37 µs to 3 ms run-to-run. Removing the GC doesn't grant a flat histogram;
-   it promotes the platform to your biggest tail source, and pinning,
-   isolation, and allocation-free steady state are still on you.
-5. **C++ shows that manual memory is not automatically fast.** Idiomatic
-   `std::map`/`std::deque` C++ allocates a node per price level and chunk —
-   5.5M mallocs over 10M ops, each paid inline — and *loses to Java on
-   throughput*, because the JVM's bump-pointer TLAB allocation is far cheaper
-   per-object than malloc; Java just presents the bill later, as GC, in the
-   tail. C++'s tail profile matches Rust's: clean through p99.9 (~25–56 µs),
-   then OS-bound at p99.99 (~1.8 ms, reproducibly). The cross-language
-   ranking flips depending on which percentile — or which cost — you look at:
-   **allocation strategy matters more than language.**
-6. **None of this is any language's ceiling.** LMAX ran Java in production by
-   refusing to allocate on the hot path (object pools,
-   [Agrona](https://github.com/aeron-io/agrona) primitive collections,
-   flyweights); low-garbage Go (`sync.Pool`, preallocation, value types) is
-   standard practice in Go trading shops for the same reason. See Future work.
-
-## Round 2 — Linux, pinned cores, and tuned engines
-
-Round 1 blamed the Rust/C++ tail on "the OS scheduler." Round 2 tested that
-claim on Linux (i9-13980HX, 8 P-cores + 16 E-cores, Ubuntu 24.04, lightly
+Round 1 (below, on macOS) blamed the Rust/C++ tail on "the OS scheduler."
+Round 2 tested that claim on Linux (i9-13980HX, 8 P-cores + 16 E-cores, Ubuntu 24.04, lightly
 loaded home server) with two new knobs, both env-gated so the idiomatic
 baselines are untouched:
 
@@ -200,6 +137,77 @@ collector never runs, and the GC tail simply does not exist.
    Which one is "better" depends on which percentile your SLA is written
    against — until you remove allocation from the hot path, at which point
    tuned Rust/C++ beat everything at every percentile.
+
+## Round 1 — macOS, out of the box, where the study started
+
+The first round ran on an everyday desktop with everything at defaults. Its
+headline tables are below and its lessons hold — but its diagnosis of the
+Rust/C++ tail ("the OS scheduler") turned out to be mostly wrong, which is
+exactly what Round 2 above demonstrates. It is kept as written because the
+wrong attribution is instructive.
+
+**Throughput** (10M ops, producer publishing as fast as the ring accepts;
+ranges across repeated runs):
+
+| | Java (disruptor 4.0) | Rust (disruptor 4.4) | Go (SPSC ring) | C++ (SPSC ring) |
+|---|---:|---:|---:|---:|
+| ops/s | 8.0–8.8M | 13.1–14.5M | 5.7–6.9M | 7.4–8.3M |
+| GC | 8–9 collections, 41–48 ms pause | — | 13 cycles, **1.2 ms** total STW | — |
+| heap allocations | (boxed keys, order objects) | 310,882 | 567,939 | **5,537,674** |
+
+**Latency** (2M ops paced at 250k ops/s, publish→processed, HdrHistogram,
+scheduled-time stamping to avoid coordinated omission). All values in
+**microseconds**; each cell is the range observed across four runs, because on
+an un-isolated desktop the run-to-run spread *is* part of the result:
+
+| percentile | Java (µs) | Rust (µs) | Go (µs) | C++ (µs) |
+|---|---:|---:|---:|---:|
+| p50 | 0.25 – 0.42 | 0.17 – 0.29 | 0.33 – 0.50 | 0.21 – 0.25 |
+| p90 | 0.67 – 0.79 | 0.54 – 0.58 | 0.71 – 0.83 | 0.63 – 0.71 |
+| p99 | 6.6 – 440 | 3.5 – 13.3 | 3.6 – 14.8 | 4.0 – 4.4 |
+| p99.9 | **1,674 – 8,208** | 37 – 3,070 | **29 – 48** | 24 – 56 |
+| p99.99 | 4,018 – 13,509 | 2,204 – 8,294 | **79 – 179** | 1,752 – 1,907 |
+| max | 4,481 – 14,017 | 2,806 – 8,897 | 165 – 744 | 2,377 – 2,530 |
+
+### What Round 1 showed
+
+1. **The architecture, not the language, sets the median.** A single-writer
+   core behind a ring buffer processes an order in a few hundred nanoseconds
+   in all four languages. If p50 is what you care about, any of them is
+   already there.
+2. **Java's tail is GC-bound and reproduces every run.** p99.9 in the
+   milliseconds, every time, tracking the collection counters one-for-one.
+   The idiomatic-collections book (`TreeMap<Long, ArrayDeque<Long>>`, boxed
+   `Long`s, an object per resting order) produces steady garbage, and G1's
+   pauses land in the distribution exactly where trading systems can least
+   afford them.
+3. **Go is the surprise: the tightest, most reproducible tail of the four.**
+   Its collector is *designed* for this — fully concurrent marking with
+   sub-millisecond stop-the-world phases (1.2 ms total across 13 cycles here,
+   vs Java's 41–48 ms across 9). The GC runs, constantly, and barely shows at
+   p99.99. The price appears elsewhere: the lowest throughput (write barriers,
+   allocation cost, no free lunch) and a slightly higher median. **GC design
+   matters more than GC presence.**
+4. **Rust has the best median and throughput, and its tail belongs to the
+   OS.** With no collector, what's left at p99.9+ is scheduler preemption and
+   core migration — which on an unpinned macOS desktop swings its tail from
+   37 µs to 3 ms run-to-run. Removing the GC doesn't grant a flat histogram;
+   it promotes the platform to your biggest tail source, and pinning,
+   isolation, and allocation-free steady state are still on you.
+5. **C++ shows that manual memory is not automatically fast.** Idiomatic
+   `std::map`/`std::deque` C++ allocates a node per price level and chunk —
+   5.5M mallocs over 10M ops, each paid inline — and *loses to Java on
+   throughput*, because the JVM's bump-pointer TLAB allocation is far cheaper
+   per-object than malloc; Java just presents the bill later, as GC, in the
+   tail. C++'s tail profile matches Rust's: clean through p99.9 (~25–56 µs),
+   then OS-bound at p99.99 (~1.8 ms, reproducibly). The cross-language
+   ranking flips depending on which percentile — or which cost — you look at:
+   **allocation strategy matters more than language.**
+6. **None of this is any language's ceiling.** LMAX ran Java in production by
+   refusing to allocate on the hot path (object pools,
+   [Agrona](https://github.com/aeron-io/agrona) primitive collections,
+   flyweights); low-garbage Go (`sync.Pool`, preallocation, value types) is
+   standard practice in Go trading shops for the same reason. See Future work.
 
 ## Architecture
 
@@ -464,16 +472,16 @@ ids; the mid random-walks in [500, 1500]. ~68% of limit orders end up trading.
 
 ## Test environments
 
-| | macOS (Rounds 1–2) | Linux (Round 2) |
+| | Linux (Round 2) | macOS (Round 1) |
 |---|---|---|
-| CPU | Apple M1 Max, 10 cores (8P+2E) | Intel i9-13980HX, 24 cores / 32 threads (8P+16E, P-cores to 5.6 GHz) |
-| RAM | 32 GB | 64 GB |
-| OS | macOS 26.3.1 | Ubuntu 24.04.4 LTS, kernel 6.14 |
-| Rust | rustc 1.92 | rustc 1.97 |
-| Java | Oracle JDK 22.0.1, default G1 | Temurin JDK 22.0.2, default G1 |
+| CPU | Intel i9-13980HX, 24 cores / 32 threads (8P+16E, P-cores to 5.6 GHz) | Apple M1 Max, 10 cores (8P+2E) |
+| RAM | 64 GB | 32 GB |
+| OS | Ubuntu 24.04.4 LTS, kernel 6.14 | macOS 26.3.1 |
+| Rust | rustc 1.97 | rustc 1.92 |
+| Java | Temurin JDK 22.0.2, default G1 | Oracle JDK 22.0.1, default G1 |
 | Go | go 1.26.5 | go 1.26.5 |
-| C++ | Homebrew clang 21, `-O3 -std=c++20` | g++ 13.3, `-O3 -std=c++20` |
-| Conditions | shared desktop, no isolation | lightly loaded home server, no `isolcpus`; pinned runs on distinct physical P-cores (8, 10) |
+| C++ | g++ 13.3, `-O3 -std=c++20` | Homebrew clang 21, `-O3 -std=c++20` |
+| Conditions | lightly loaded home server, no `isolcpus`; pinned runs on distinct physical P-cores (8, 10) | shared desktop, no isolation |
 
 Both are everyday machines, deliberately: the study measures what languages and
 disciplines deliver under realistic conditions, not on a lab-isolated box —
@@ -493,14 +501,15 @@ and run-to-run ranges are reported for exactly that reason.
   isn't shaping the other results.
 - Throughput mode measures the drain-inclusive wall clock: publish loop plus a
   final sentinel event, ending when the consumer has processed everything.
-- Caveats: macOS, no core pinning or isolation, shared desktop machine, one
-  JVM/one binary run per mode, default JVM flags (JDK 22, default G1). Treat
-  absolute numbers as indicative, deltas as the signal. Run-to-run tail
-  variance is large on a shared machine — Rust's p99.9 has been observed
-  anywhere from ~40 µs to ~3 ms across runs (scheduler noise), while Java's
+- Round 1 caveats: macOS, no core pinning or isolation, shared desktop
+  machine, one JVM/one binary run per mode, default JVM flags (JDK 22,
+  default G1). Treat absolute numbers as indicative, deltas as the signal.
+  Run-to-run tail variance is large on a shared machine — Rust's p99.9 has
+  been observed anywhere from ~40 µs to ~3 ms across runs, while Java's
   multi-millisecond p99.9+ and Go's tens-of-microseconds p99.9 both reproduce
-  every run; that reproducibility is the actual finding. Linux + pinned cores
-  + JMH-style forking would tighten all of it (see below).
+  every run; that reproducibility is the actual finding. Round 2 (Linux,
+  pinned cores) tightened exactly what this predicts; JMH-style forking
+  remains future work.
 
 ## Run it
 
