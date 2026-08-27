@@ -16,11 +16,13 @@ struct Event {
     uint64_t ts; // scheduled-publish nanos since run epoch; 0 = don't measure
 };
 
+// Power of two, required: slot lookup is then `seq & mask` — a single AND
+// computes seq mod RING_SIZE, instead of an integer division per access.
 constexpr uint64_t RING_SIZE = 65536;
 
 struct Ring {
     std::vector<Event> buf{RING_SIZE};
-    uint64_t mask = RING_SIZE - 1;
+    uint64_t mask = RING_SIZE - 1;  // all ones: seq & mask == seq mod RING_SIZE
     alignas(64) std::atomic<uint64_t> prod{0};
     alignas(64) std::atomic<uint64_t> cons{0};
 

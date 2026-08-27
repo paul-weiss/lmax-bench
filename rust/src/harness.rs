@@ -97,6 +97,8 @@ fn engine_from_env() -> (AnyBook, &'static str) {
     }
 }
 
+// Power of two, as the disruptor crate requires: the ring indexes slots with
+// `seq & (N-1)` — a single AND computing seq mod N, not a division.
 const RING_SIZE: usize = 65_536;
 
 pub fn run(total_ops: u64, warmup_ops: u64, rate: Option<u64>) -> (Report, f64) {

@@ -16,11 +16,13 @@ type event struct {
 	ts         uint64 // scheduled-publish nanos since run epoch; 0 = don't measure
 }
 
+// Power of two, required: slot lookup is then `seq & mask` — a single AND
+// computes seq mod ringSize, instead of an integer division per access.
 const ringSize = 65_536
 
 type ring struct {
 	buf  []event
-	mask uint64
+	mask uint64 // ringSize - 1: all ones, so seq & mask == seq mod ringSize
 	_    [56]byte // keep the cursors on separate cache lines
 	prod atomic.Uint64
 	_    [56]byte

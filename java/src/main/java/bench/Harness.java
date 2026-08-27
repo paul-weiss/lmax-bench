@@ -18,6 +18,8 @@ import static bench.Ev.SIDE_BID;
 
 /** Builds the Disruptor, runs a mode, and reports. */
 final class Harness {
+    // Power of two, as the Disruptor requires: the RingBuffer indexes slots
+    // with `sequence & (N-1)` — a single AND computing sequence mod N.
     static final int RING_SIZE = 65_536;
 
     record RunResult(Report report, double wallSeconds, long gcCount, long gcMillis) {}
