@@ -1,4 +1,4 @@
-module clob-bench
+module github.com/paul-weiss/lmax-bench/go
 
 go 1.26.5
 

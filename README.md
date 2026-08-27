@@ -511,6 +511,35 @@ PIN_PROD=8 PIN_CONS=10 ./clob-bench all    # pin threads (Linux)
 
 Or all four, back to back, via `./run.sh`.
 
+## Reusing this code
+
+This is a benchmark, so reuse means reading, copying, and conforming — not
+importing. Four recipes, in descending order of uniqueness:
+
+1. **Verify your own matching engine** — the deterministic workload plus the
+   book checksum form a free correctness oracle: implement the semantics, feed
+   the seed-42 stream, compare against the published vectors. Everything you
+   need, including the exact spec and the reference numbers, is in
+   [CONFORMANCE.md](CONFORMANCE.md). This works for a fifth language, a
+   rewrite, or a refactor of any of the four here (it is how this repo's own
+   restructuring was proven behavior-preserving).
+2. **Lift a ring** — `go/ring.go` and `cpp/ring.hpp` are dependency-free
+   ~40-line SPSC busy-spin rings under MIT: copy the file, rename the event
+   type, done. (Java and Rust users: use the real
+   [Disruptor](https://github.com/LMAX-Exchange/disruptor) /
+   [`disruptor`](https://crates.io/crates/disruptor) libraries, as this repo
+   does.) The Go module is importable as
+   `github.com/paul-weiss/lmax-bench/go` if you prefer `go get` to copying.
+3. **Start a book from ours** — `book.*` / `tuned.*` are single-responsibility
+   files meant to be copied as the skeleton of a real book and then owned:
+   your order types, your tick handling, your id scheme. An order book is
+   domain logic, not a dependency — which is why these are deliberately not
+   published as packages.
+4. **Steal the harness methodology** — the coordinated-omission-safe pacing
+   loop, warmup discipline, HdrHistogram wiring, and the allocation/GC
+   counters (`harness.*`) are a template for benchmarking any event-processing
+   core: swap the book for your component, keep the measurement scaffolding.
+
 ## Future work
 
 - Agrona-based Java variant (the production-grade version of the primitive-
