@@ -1,69 +1,66 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 620" font-family="Helvetica Neue, Helvetica, Arial, sans-serif">
-  <rect width="980" height="620" fill="#ffffff"/>
-  <text x="490" y="42" text-anchor="middle" font-size="24" font-weight="700" fill="#20242a">The LMAX Disruptor</text>
-  <text x="490" y="66" text-anchor="middle" font-size="14" fill="#5b6570">single-producer / single-consumer configuration, as used in lmax-bench</text>
-
-  <path d="M 434.6 135.1 A 165 165 0 0 1 488.9 145.9 L 466.4 204.7 A 102 102 0 0 0 432.8 198.0 Z" fill="#dfe3e8" stroke="#ffffff" stroke-width="1"/><path d="M 497.4 149.4 A 165 165 0 0 1 543.4 180.1 L 500.1 225.9 A 102 102 0 0 0 471.6 206.9 Z" fill="#dfe3e8" stroke="#ffffff" stroke-width="1"/><path d="M 549.9 186.6 A 165 165 0 0 1 580.6 232.6 L 523.1 258.4 A 102 102 0 0 0 504.1 229.9 Z" fill="#dfe3e8" stroke="#ffffff" stroke-width="1"/><path d="M 584.1 241.1 A 165 165 0 0 1 594.9 295.4 L 532.0 297.2 A 102 102 0 0 0 525.3 263.6 Z" fill="#dfe3e8" stroke="#ffffff" stroke-width="1"/><path d="M 594.9 304.6 A 165 165 0 0 1 584.1 358.9 L 525.3 336.4 A 102 102 0 0 0 532.0 302.8 Z" fill="#1b9e8f" stroke="#ffffff" stroke-width="1"/><path d="M 580.6 367.4 A 165 165 0 0 1 549.9 413.4 L 504.1 370.1 A 102 102 0 0 0 523.1 341.6 Z" fill="#1b9e8f" stroke="#ffffff" stroke-width="1"/><path d="M 543.4 419.9 A 165 165 0 0 1 497.4 450.6 L 471.6 393.1 A 102 102 0 0 0 500.1 374.1 Z" fill="#1b9e8f" stroke="#ffffff" stroke-width="1"/><path d="M 488.9 454.1 A 165 165 0 0 1 434.6 464.9 L 432.8 402.0 A 102 102 0 0 0 466.4 395.3 Z" fill="#1b9e8f" stroke="#ffffff" stroke-width="1"/><path d="M 425.4 464.9 A 165 165 0 0 1 371.1 454.1 L 393.6 395.3 A 102 102 0 0 0 427.2 402.0 Z" fill="#1b9e8f" stroke="#ffffff" stroke-width="1"/><path d="M 362.6 450.6 A 165 165 0 0 1 316.6 419.9 L 359.9 374.1 A 102 102 0 0 0 388.4 393.1 Z" fill="#1b9e8f" stroke="#ffffff" stroke-width="1"/><path d="M 310.1 413.4 A 165 165 0 0 1 279.4 367.4 L 336.9 341.6 A 102 102 0 0 0 355.9 370.1 Z" fill="#1b9e8f" stroke="#ffffff" stroke-width="1"/><path d="M 275.9 358.9 A 165 165 0 0 1 265.1 304.6 L 328.0 302.8 A 102 102 0 0 0 334.7 336.4 Z" fill="#1b9e8f" stroke="#ffffff" stroke-width="1"/><path d="M 265.1 295.4 A 165 165 0 0 1 275.9 241.1 L 334.7 263.6 A 102 102 0 0 0 328.0 297.2 Z" fill="#e8833a" stroke="#ffffff" stroke-width="1"/><path d="M 279.4 232.6 A 165 165 0 0 1 310.1 186.6 L 355.9 229.9 A 102 102 0 0 0 336.9 258.4 Z" fill="#dfe3e8" stroke="#ffffff" stroke-width="1"/><path d="M 316.6 180.1 A 165 165 0 0 1 362.6 149.4 L 388.4 206.9 A 102 102 0 0 0 359.9 225.9 Z" fill="#dfe3e8" stroke="#ffffff" stroke-width="1"/><path d="M 371.1 145.9 A 165 165 0 0 1 425.4 135.1 L 427.2 198.0 A 102 102 0 0 0 393.6 204.7 Z" fill="#dfe3e8" stroke="#ffffff" stroke-width="1"/>
-  <text x="561" y="330" text-anchor="middle" font-size="11" fill="#ffffff" font-family="ui-monospace,Menlo,monospace">419</text><text x="541" y="378" text-anchor="middle" font-size="11" fill="#ffffff" font-family="ui-monospace,Menlo,monospace">420</text><text x="504" y="415" text-anchor="middle" font-size="11" fill="#ffffff" font-family="ui-monospace,Menlo,monospace">421</text><text x="456" y="435" text-anchor="middle" font-size="11" fill="#ffffff" font-family="ui-monospace,Menlo,monospace">422</text><text x="404" y="435" text-anchor="middle" font-size="11" fill="#ffffff" font-family="ui-monospace,Menlo,monospace">423</text><text x="356" y="415" text-anchor="middle" font-size="11" fill="#ffffff" font-family="ui-monospace,Menlo,monospace">424</text><text x="319" y="378" text-anchor="middle" font-size="11" fill="#ffffff" font-family="ui-monospace,Menlo,monospace">425</text><text x="299" y="330" text-anchor="middle" font-size="11" fill="#ffffff" font-family="ui-monospace,Menlo,monospace">426</text><text x="299" y="278" text-anchor="middle" font-size="11" fill="#ffffff" font-family="ui-monospace,Menlo,monospace">427</text>
-  <text x="430" y="286" text-anchor="middle" font-size="15" font-weight="600" fill="#20242a">ring buffer</text>
-  <text x="430" y="306" text-anchor="middle" font-size="12" fill="#5b6570">65,536 pre-allocated</text>
-  <text x="430" y="322" text-anchor="middle" font-size="12" fill="#5b6570">event slots</text>
-  <text x="430" y="344" text-anchor="middle" font-size="11" font-family="ui-monospace,Menlo,monospace" fill="#5b6570">index = seq &amp; (N-1)</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1420 700" font-family="Helvetica Neue, Helvetica, Arial, sans-serif">
+  <rect width="1420" height="700" fill="#ffffff"/>
+  <text x="710.0" y="40" text-anchor="middle" font-size="24" font-weight="700" fill="#20242a">The LMAX Disruptor feeding a CLOB &#8212; BTC-USD</text>
+  <text x="710.0" y="64" text-anchor="middle" font-size="14" fill="#5b6570">one thread publishes orders into the ring; one single-writer core matches them against the book &#8212; as implemented four times in lmax-bench</text>
 
   <defs>
     <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-      <path d="M 0 0 L 10 5 L 0 10 z" fill="#20242a"/>
-    </marker>
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#20242a"/></marker>
     <marker id="arrO" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-      <path d="M 0 0 L 10 5 L 0 10 z" fill="#e8833a"/>
-    </marker>
-    <marker id="arrT" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-      <path d="M 0 0 L 10 5 L 0 10 z" fill="#1b9e8f"/>
-    </marker>
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#e8833a"/></marker>
   </defs>
 
-  <!-- producer (left) -->
-  <rect x="30" y="96" width="204" height="96" rx="10" fill="#f4f6f8" stroke="#c9d0d8"/>
-  <text x="132" y="126" text-anchor="middle" font-size="15" font-weight="600" fill="#20242a">Producer thread</text>
-  <text x="132" y="148" text-anchor="middle" font-size="12" fill="#5b6570">workload generator</text>
-  <text x="132" y="166" text-anchor="middle" font-size="12" fill="#5b6570">claim &#8594; write in place &#8594; publish</text>
-  <path d="M 170 192 C 200 226 220 240 252 258" stroke="#20242a" stroke-width="2" fill="none" marker-end="url(#arr)"/>
+  <!-- ===== left: producer + ring ===== -->
+  <rect x="120" y="108" width="360" height="64" rx="10" fill="#f4f6f8" stroke="#c9d0d8"/>
+  <text x="300" y="134" text-anchor="middle" font-size="14.5" font-weight="600" fill="#20242a">Producer thread &#8212; order gateway</text>
+  <text x="300" y="154" text-anchor="middle" font-size="12" fill="#5b6570">claim slot &#8594; write order in place &#8594; publish</text>
+  <line x1="300" y1="172" x2="300" y2="200" stroke="#20242a" stroke-width="2" marker-end="url(#arr)"/>
 
-  <line x1="219" y1="258" x2="260" y2="266" stroke="#e8833a" stroke-width="2.5" marker-end="url(#arrO)"/>
-  <text x="215" y="278" text-anchor="end" font-size="12" font-weight="600" fill="#e8833a">producer cursor</text>
-  <text x="215" y="294" text-anchor="end" font-size="11" fill="#5b6570">claims the next slot; waits</text>
-  <text x="215" y="309" text-anchor="end" font-size="11" fill="#5b6570">only when the ring is full</text>
+  <path d="M 304.0 222.1 A 128 128 0 0 1 345.2 230.3 L 328.3 275.2 A 80 80 0 0 0 302.5 270.0 Z" fill="#dfe3e8" stroke="#ffffff" stroke-width="1"/><path d="M 352.7 233.3 A 128 128 0 0 1 387.6 256.7 L 354.8 291.7 A 80 80 0 0 0 332.9 277.1 Z" fill="#dfe3e8" stroke="#ffffff" stroke-width="1"/><path d="M 393.3 262.4 A 128 128 0 0 1 416.7 297.3 L 372.9 317.1 A 80 80 0 0 0 358.3 295.2 Z" fill="#dfe3e8" stroke="#ffffff" stroke-width="1"/><path d="M 419.7 304.8 A 128 128 0 0 1 427.9 346.0 L 380.0 347.5 A 80 80 0 0 0 374.8 321.7 Z" fill="#dfe3e8" stroke="#ffffff" stroke-width="1"/><path d="M 427.9 354.0 A 128 128 0 0 1 419.7 395.2 L 374.8 378.3 A 80 80 0 0 0 380.0 352.5 Z" fill="#1b9e8f" stroke="#ffffff" stroke-width="1"/><path d="M 416.7 402.7 A 128 128 0 0 1 393.3 437.6 L 358.3 404.8 A 80 80 0 0 0 372.9 382.9 Z" fill="#1b9e8f" stroke="#ffffff" stroke-width="1"/><path d="M 387.6 443.3 A 128 128 0 0 1 352.7 466.7 L 332.9 422.9 A 80 80 0 0 0 354.8 408.3 Z" fill="#1b9e8f" stroke="#ffffff" stroke-width="1"/><path d="M 345.2 469.7 A 128 128 0 0 1 304.0 477.9 L 302.5 430.0 A 80 80 0 0 0 328.3 424.8 Z" fill="#1b9e8f" stroke="#ffffff" stroke-width="1"/><path d="M 296.0 477.9 A 128 128 0 0 1 254.8 469.7 L 271.7 424.8 A 80 80 0 0 0 297.5 430.0 Z" fill="#1b9e8f" stroke="#ffffff" stroke-width="1"/><path d="M 247.3 466.7 A 128 128 0 0 1 212.4 443.3 L 245.2 408.3 A 80 80 0 0 0 267.1 422.9 Z" fill="#1b9e8f" stroke="#ffffff" stroke-width="1"/><path d="M 206.7 437.6 A 128 128 0 0 1 183.3 402.7 L 227.1 382.9 A 80 80 0 0 0 241.7 404.8 Z" fill="#1b9e8f" stroke="#ffffff" stroke-width="1"/><path d="M 180.3 395.2 A 128 128 0 0 1 172.1 354.0 L 220.0 352.5 A 80 80 0 0 0 225.2 378.3 Z" fill="#1b9e8f" stroke="#ffffff" stroke-width="1"/><path d="M 172.1 346.0 A 128 128 0 0 1 180.3 304.8 L 225.2 321.7 A 80 80 0 0 0 220.0 347.5 Z" fill="#e8833a" stroke="#ffffff" stroke-width="1"/><path d="M 183.3 297.3 A 128 128 0 0 1 206.7 262.4 L 241.7 295.2 A 80 80 0 0 0 227.1 317.1 Z" fill="#dfe3e8" stroke="#ffffff" stroke-width="1"/><path d="M 212.4 256.7 A 128 128 0 0 1 247.3 233.3 L 267.1 277.1 A 80 80 0 0 0 245.2 291.7 Z" fill="#dfe3e8" stroke="#ffffff" stroke-width="1"/><path d="M 254.8 230.3 A 128 128 0 0 1 296.0 222.1 L 297.5 270.0 A 80 80 0 0 0 271.7 275.2 Z" fill="#dfe3e8" stroke="#ffffff" stroke-width="1"/>
+  <text x="402" y="374" text-anchor="middle" font-size="10" fill="#fff" font-family="ui-monospace,Menlo,monospace">419</text><text x="386" y="412" text-anchor="middle" font-size="10" fill="#fff" font-family="ui-monospace,Menlo,monospace">420</text><text x="358" y="440" text-anchor="middle" font-size="10" fill="#fff" font-family="ui-monospace,Menlo,monospace">421</text><text x="320" y="456" text-anchor="middle" font-size="10" fill="#fff" font-family="ui-monospace,Menlo,monospace">422</text><text x="280" y="456" text-anchor="middle" font-size="10" fill="#fff" font-family="ui-monospace,Menlo,monospace">423</text><text x="242" y="440" text-anchor="middle" font-size="10" fill="#fff" font-family="ui-monospace,Menlo,monospace">424</text><text x="214" y="412" text-anchor="middle" font-size="10" fill="#fff" font-family="ui-monospace,Menlo,monospace">425</text><text x="198" y="374" text-anchor="middle" font-size="10" fill="#fff" font-family="ui-monospace,Menlo,monospace">426</text><text x="198" y="334" text-anchor="middle" font-size="10" fill="#fff" font-family="ui-monospace,Menlo,monospace">427</text>
+  <text x="300" y="342" text-anchor="middle" font-size="14" font-weight="600" fill="#20242a">ring buffer</text>
+  <text x="300" y="360" text-anchor="middle" font-size="11" fill="#5b6570">65,536 pre-allocated slots</text>
+  <text x="300" y="378" text-anchor="middle" font-size="10" font-family="ui-monospace,Menlo,monospace" fill="#5b6570">index = seq &amp; (N-1)</text>
 
-  <!-- consumer (right) -->
-  <rect x="746" y="96" width="204" height="112" rx="10" fill="#f4f6f8" stroke="#c9d0d8"/>
-  <text x="848" y="126" text-anchor="middle" font-size="15" font-weight="600" fill="#20242a">Consumer thread</text>
-  <text x="848" y="148" text-anchor="middle" font-size="12" fill="#5b6570">single-writer matching core</text>
-  <text x="848" y="166" text-anchor="middle" font-size="12" fill="#5b6570">owns ALL book state</text>
-  <text x="848" y="184" text-anchor="middle" font-size="12" fill="#5b6570">no locks anywhere</text>
-  <path d="M 610 250 C 660 218 700 200 746 186" stroke="#20242a" stroke-width="2" fill="none" marker-end="url(#arr)"/>
+  <line x1="131" y1="316" x2="167" y2="323" stroke="#e8833a" stroke-width="2.5" marker-end="url(#arrO)"/>
 
-  <line x1="641" y1="342" x2="600" y2="334" stroke="#1b9e8f" stroke-width="2.5" marker-end="url(#arrT)"/>
-  <text x="647" y="362" font-size="12" font-weight="600" fill="#1b9e8f">consumer cursor</text>
-  <text x="647" y="378" font-size="11" fill="#5b6570">busy-spins until the producer</text>
-  <text x="647" y="393" font-size="11" fill="#5b6570">cursor moves ahead, then</text>
-  <text x="647" y="408" font-size="11" fill="#5b6570">drains the batch in order</text>
+  <!-- claimed event payload callout -->
+  <rect x="60" y="516" width="300" height="74" rx="8" fill="#fdf2e7" stroke="#e8833a"/>
+  <text x="210" y="538" text-anchor="middle" font-size="12" font-weight="700" fill="#e8833a">event 427 &#8212; being written</text>
+  <text x="210" y="558" text-anchor="middle" font-size="12.5" fill="#20242a" font-family="ui-monospace,Menlo,monospace">NEW LIMIT BUY 1.00 BTC</text>
+  <text x="210" y="576" text-anchor="middle" font-size="12.5" fill="#20242a" font-family="ui-monospace,Menlo,monospace">@ 78,997.50  id=8231427</text>
+  <path d="M 235 516 C 250 500 240 480 232 464" stroke="#e8833a" stroke-width="1.5" fill="none" marker-end="url(#arrO)"/>
 
-  <!-- legend -->
-  <g transform="translate(60,505)">
-    <rect x="0" y="0" width="16" height="16" rx="3" fill="#1b9e8f"/>
-    <text x="24" y="13" font-size="12.5" fill="#20242a">published — written, awaiting the consumer (sequence numbers shown)</text>
-    <rect x="0" y="26" width="16" height="16" rx="3" fill="#e8833a"/>
-    <text x="24" y="39" font-size="12.5" fill="#20242a">claimed — producer writing the next event in place</text>
-    <rect x="0" y="52" width="16" height="16" rx="3" fill="#dfe3e8"/>
-    <text x="24" y="65" font-size="12.5" fill="#20242a">free — already consumed; the slot (and its event object) is reused, never freed</text>
+  <!-- ring mini-legend -->
+  <g transform="translate(60,618)">
+    <rect x="0" y="0" width="13" height="13" rx="3" fill="#1b9e8f"/><text x="20" y="11" font-size="11.5" fill="#20242a">published, awaiting the core</text>
+    <rect x="230" y="0" width="13" height="13" rx="3" fill="#e8833a"/><text x="250" y="11" font-size="11.5" fill="#20242a">claimed</text>
+    <rect x="340" y="0" width="13" height="13" rx="3" fill="#dfe3e8"/><text x="360" y="11" font-size="11.5" fill="#20242a">free &#8212; reused, never freed</text>
   </g>
 
-  <g transform="translate(660,478)">
-    <text x="0" y="0" font-size="13" font-weight="700" fill="#20242a">Why it beats a locked queue</text>
-    <text x="0" y="22" font-size="12" fill="#5b6570">&#8226; one writer per cursor &#8594; no contention, no locks</text>
-    <text x="0" y="41" font-size="12" fill="#5b6570">&#8226; cursors on separate cache lines &#8594; no false sharing</text>
-    <text x="0" y="60" font-size="12" fill="#5b6570">&#8226; slots pre-allocated once &#8594; zero steady-state garbage</text>
-    <text x="0" y="79" font-size="12" fill="#5b6570">&#8226; sequential slot access &#8594; the prefetcher does the work</text>
-    <text x="0" y="98" font-size="12" fill="#5b6570">&#8226; contiguous batches &#8594; amortized memory barriers</text>
-  </g>
+  <!-- ===== middle arrow ===== -->
+  <path d="M 452 350 C 520 350 540 340 596 322" stroke="#20242a" stroke-width="2.5" fill="none" marker-end="url(#arr)"/>
+  <text x="522" y="296" text-anchor="middle" font-size="12" font-weight="600" fill="#20242a">orders, in sequence</text>
+  <text x="522" y="312" text-anchor="middle" font-size="11" fill="#5b6570">consumed by ONE thread</text>
+
+  <!-- ===== right: the CLOB ===== -->
+  <text x="1006" y="104" text-anchor="middle" font-size="15" font-weight="700" fill="#20242a">Single-writer matching core &#8212; the BTC-USD limit order book</text>
+  <rect x="686" y="124" width="640" height="36" rx="6" fill="#f6e2e2" opacity="0.45"/><text x="792" y="143" text-anchor="end" font-size="13.5" font-weight="400" fill="#c95555" font-family="ui-monospace,Menlo,monospace">79,000.50</text><rect x="810" y="126" width="62" height="26" rx="6" fill="#c95555" stroke="#c95555"/><text x="841.0" y="143" text-anchor="middle" font-size="12" fill="#ffffff" font-family="ui-monospace,Menlo,monospace">0.75</text><rect x="880" y="126" width="68" height="26" rx="6" fill="#c95555" stroke="#c95555"/><text x="914.0" y="143" text-anchor="middle" font-size="12" fill="#ffffff" font-family="ui-monospace,Menlo,monospace">1.20</text><rect x="686" y="164" width="640" height="36" rx="6" fill="#f6e2e2" opacity="0.45"/><text x="792" y="183" text-anchor="end" font-size="13.5" font-weight="400" fill="#c95555" font-family="ui-monospace,Menlo,monospace">78,999.00</text><rect x="810" y="166" width="81" height="26" rx="6" fill="#c95555" stroke="#c95555"/><text x="850.5" y="183" text-anchor="middle" font-size="12" fill="#ffffff" font-family="ui-monospace,Menlo,monospace">2.10</text><rect x="686" y="204" width="640" height="36" rx="6" fill="#f6e2e2" opacity="0.45"/><text x="792" y="223" text-anchor="end" font-size="13.5" font-weight="400" fill="#c95555" font-family="ui-monospace,Menlo,monospace">78,998.50</text><rect x="810" y="206" width="57" height="26" rx="6" fill="#c95555" stroke="#c95555"/><text x="838.5" y="223" text-anchor="middle" font-size="12" fill="#ffffff" font-family="ui-monospace,Menlo,monospace">0.40</text><rect x="875" y="206" width="56" height="26" rx="6" fill="#c95555" stroke="#c95555"/><text x="903.0" y="223" text-anchor="middle" font-size="12" fill="#ffffff" font-family="ui-monospace,Menlo,monospace">0.33</text><rect x="939" y="206" width="64" height="26" rx="6" fill="#c95555" stroke="#c95555"/><text x="971.0" y="223" text-anchor="middle" font-size="12" fill="#ffffff" font-family="ui-monospace,Menlo,monospace">0.90</text><rect x="686" y="244" width="640" height="36" rx="6" fill="#f6e2e2" opacity="0.45"/><text x="792" y="263" text-anchor="end" font-size="13.5" font-weight="400" fill="#c95555" font-family="ui-monospace,Menlo,monospace">78,997.50</text><rect x="810" y="246" width="66" height="26" rx="6" fill="#c95555" stroke="#c95555"/><text x="843.0" y="263" text-anchor="middle" font-size="12" fill="#ffffff" font-family="ui-monospace,Menlo,monospace">1.05</text><rect x="686" y="284" width="640" height="36" rx="6" fill="#f6e2e2" opacity="0.9"/><text x="792" y="303" text-anchor="end" font-size="13.5" font-weight="700" fill="#c95555" font-family="ui-monospace,Menlo,monospace">78,997.00</text><rect x="810" y="286" width="56" height="26" rx="6" fill="#c95555" stroke="#c95555"/><text x="838.0" y="303" text-anchor="middle" font-size="12" fill="#ffffff" font-family="ui-monospace,Menlo,monospace">0.30</text><rect x="874" y="286" width="63" height="26" rx="6" fill="#c95555" stroke="#c95555"/><text x="905.5" y="303" text-anchor="middle" font-size="12" fill="#ffffff" font-family="ui-monospace,Menlo,monospace">0.85</text><rect x="945" y="286" width="53" height="26" rx="6" fill="#c95555" stroke="#c95555"/><text x="971.5" y="303" text-anchor="middle" font-size="12" fill="#ffffff" font-family="ui-monospace,Menlo,monospace">0.12</text><text x="1332" y="303" text-anchor="end" font-size="12" font-weight="600" fill="#c95555">&#9664; best ask</text><line x1="686" y1="332" x2="1326" y2="332" stroke="#b9c2cc" stroke-width="1" stroke-dasharray="4 4"/><text x="1006" y="346" text-anchor="middle" font-size="12" font-weight="600" fill="#5b6570">spread $0.50</text><rect x="686" y="350" width="640" height="36" rx="6" fill="#dff0ee" opacity="0.95"/><text x="792" y="369" text-anchor="end" font-size="13.5" font-weight="700" fill="#1b9e8f" font-family="ui-monospace,Menlo,monospace">78,996.50</text><rect x="810" y="352" width="57" height="26" rx="6" fill="#1b9e8f" stroke="#1b9e8f"/><text x="838.5" y="369" text-anchor="middle" font-size="12" fill="#ffffff" font-family="ui-monospace,Menlo,monospace">0.42</text><rect x="875" y="352" width="67" height="26" rx="6" fill="#1b9e8f" stroke="#1b9e8f"/><text x="908.5" y="369" text-anchor="middle" font-size="12" fill="#ffffff" font-family="ui-monospace,Menlo,monospace">1.10</text><text x="1332" y="369" text-anchor="end" font-size="12" font-weight="600" fill="#1b9e8f">&#9664; best bid</text><rect x="686" y="390" width="640" height="36" rx="6" fill="#dff0ee" opacity="0.5"/><text x="792" y="409" text-anchor="end" font-size="13.5" font-weight="400" fill="#1b9e8f" font-family="ui-monospace,Menlo,monospace">78,996.00</text><rect x="810" y="392" width="64" height="26" rx="6" fill="#1b9e8f" stroke="#1b9e8f"/><text x="842.0" y="409" text-anchor="middle" font-size="12" fill="#ffffff" font-family="ui-monospace,Menlo,monospace">0.88</text><rect x="686" y="430" width="640" height="36" rx="6" fill="#dff0ee" opacity="0.5"/><text x="792" y="449" text-anchor="end" font-size="13.5" font-weight="400" fill="#1b9e8f" font-family="ui-monospace,Menlo,monospace">78,995.00</text><rect x="810" y="432" width="85" height="26" rx="6" fill="#1b9e8f" stroke="#1b9e8f"/><text x="852.5" y="449" text-anchor="middle" font-size="12" fill="#ffffff" font-family="ui-monospace,Menlo,monospace">2.40</text><rect x="903" y="432" width="54" height="26" rx="6" fill="#1b9e8f" stroke="#1b9e8f"/><text x="930.0" y="449" text-anchor="middle" font-size="12" fill="#ffffff" font-family="ui-monospace,Menlo,monospace">0.15</text><rect x="686" y="470" width="640" height="36" rx="6" fill="#dff0ee" opacity="0.5"/><text x="792" y="489" text-anchor="end" font-size="13.5" font-weight="400" fill="#1b9e8f" font-family="ui-monospace,Menlo,monospace">78,994.50</text><rect x="810" y="472" width="60" height="26" rx="6" fill="#1b9e8f" stroke="#1b9e8f"/><text x="840.0" y="489" text-anchor="middle" font-size="12" fill="#ffffff" font-family="ui-monospace,Menlo,monospace">0.60</text><rect x="686" y="510" width="640" height="36" rx="6" fill="#dff0ee" opacity="0.5"/><text x="792" y="529" text-anchor="end" font-size="13.5" font-weight="400" fill="#1b9e8f" font-family="ui-monospace,Menlo,monospace">78,993.50</text><rect x="810" y="512" width="76" height="26" rx="6" fill="#1b9e8f" stroke="#1b9e8f"/><text x="848.0" y="529" text-anchor="middle" font-size="12" fill="#ffffff" font-family="ui-monospace,Menlo,monospace">1.75</text><rect x="894" y="512" width="59" height="26" rx="6" fill="#1b9e8f" stroke="#1b9e8f"/><text x="923.5" y="529" text-anchor="middle" font-size="12" fill="#ffffff" font-family="ui-monospace,Menlo,monospace">0.55</text><rect x="961" y="512" width="52" height="26" rx="6" fill="#1b9e8f" stroke="#1b9e8f"/><text x="987.0" y="529" text-anchor="middle" font-size="12" fill="#ffffff" font-family="ui-monospace,Menlo,monospace">0.05</text>
+
+  <!-- price priority bracket -->
+  <path d="M 670 124 L 658 124 L 658 546 L 670 546" stroke="#5b6570" stroke-width="1.5" fill="none"/>
+  <text x="648" y="343.0" text-anchor="middle" font-size="12" font-weight="600" fill="#5b6570" transform="rotate(-90 648 343.0)">price priority</text>
+
+  <!-- time priority annotation on best ask queue -->
+  <path d="M 810 566 L 982 566" stroke="#5b6570" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="1000" y="570" font-size="11.5" font-weight="600" fill="#5b6570">time priority (FIFO): oldest first within a level</text>
+
+  <!-- incoming aggressive order -->
+  <rect x="1130" y="212" width="204" height="30" rx="7" fill="#e8833a"/>
+  <text x="1232" y="232" text-anchor="middle" font-size="12.5" font-weight="700" fill="#ffffff" font-family="ui-monospace,Menlo,monospace">BUY 1.00 @ 78,997.50</text>
+  <path d="M 1170 244 C 1130 262 1100 274 1068 296" stroke="#e8833a" stroke-width="2.5" fill="none" marker-end="url(#arrO)"/>
+  <text x="700" y="606" font-size="12.5" fill="#20242a"><tspan font-weight="700" fill="#e8833a">event 427 arrives:</tspan> crosses the spread at the best ask &#8212; fills 0.30, then 0.70 of the 0.85</text>
+  <text x="700" y="624" font-size="12.5" fill="#20242a">(price first, oldest first). 0.15 of the second order rests; the 78,997.50 ask is untouched.</text>
+
+  <text x="710.0" y="682" text-anchor="middle" font-size="11" fill="#5b6570">BTC-USD &#8776; $79,000, August 2026. In the benchmark the same book runs on integer ticks; each event carries (side, price, qty, id).</text>
 </svg>
