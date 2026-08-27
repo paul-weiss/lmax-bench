@@ -207,6 +207,50 @@ All four are the same shape — the LMAX pattern:
 
 ![The LMAX Disruptor — single-producer/single-consumer ring buffer between the workload producer and the single-writer matching core](disruptor.svg)
 
+The whole program, as pseudocode — the ring buffer is the delivery mechanism,
+the matching algorithm is the payload of one arm of the consumer's switch:
+
+```
+# ============ PRODUCER THREAD ============
+loop:
+    op = next_operation()                  # splitmix64 workload gen
+    slot = ring.claim()                    # spins only if the ring is full
+    write op into slot, in place           # slot is pre-allocated — no allocation, ever
+    ring.publish()                         # advance producer cursor (release store)
+
+# ============ CONSUMER THREAD (single writer — owns ALL book state) ============
+seq = 0
+loop:
+    spin until producer_cursor > seq       # busy-wait (acquire load)
+    seq += 1
+    e = ring[seq mod N]                    # N is a power of two: computed as seq & (N-1)
+    case e.kind:
+        LIMIT  -> limit(e)                 # the matching algorithm, below
+        CANCEL -> cancel(e.id)             # remove from id map only (lazy)
+    consumer_cursor = seq                  # frees the slot for reuse
+
+# ============ limit(e) — price-time priority matching ============
+while e.qty > 0:
+    level = best opposite price level      # lowest ask for a buy, highest bid for a sell
+    if no level, or it does not cross e.price: break
+    while e.qty > 0 and level not empty:
+        head = oldest order id at level    # FIFO = time priority
+        if head not in id map:             # lazily-cancelled tombstone
+            pop head; continue
+        fill = min(e.qty, head.qty)
+        head.qty -= fill; e.qty -= fill    # partial fill stays AT THE HEAD (keeps priority)
+        if head.qty == 0: remove from id map; pop head
+    if level is empty: remove the level    # tuned engines: advance the best pointer
+if e.qty > 0: append e.id to the FIFO at e.price; insert into id map    # rest the residual
+```
+
+Note what is absent from `limit()`: locks, atomics, defensive copies. The ring's
+single-consumer contract means the matching core runs as if single-threaded —
+the two cursors are the only shared state in the program, so all concurrency is
+paid at the boundary. Draining in strict sequence order is also what makes the
+book a deterministic fold over the event stream, which is what the
+cross-language checksum (and, in a real venue, replay recovery) relies on.
+
 - One producer, one consumer, busy-spin on both sides, ring size 65,536.
 - Transports: Java uses the original Disruptor (`BusySpinWaitStrategy`,
   `ProducerType.SINGLE`); Rust the `disruptor` crate (`BusySpin`); Go and C++
