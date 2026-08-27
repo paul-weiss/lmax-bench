@@ -88,6 +88,72 @@ comparison meaningful.
    flyweights); low-garbage Go (`sync.Pool`, preallocation, value types) is
    standard practice in Go trading shops for the same reason. See Future work.
 
+## Round 2 — Linux, pinned cores, and tuned engines
+
+Round 1 blamed the Rust/C++ tail on "the OS scheduler." Round 2 tested that
+claim on Linux (i9-13980HX, 8 P-cores + 16 E-cores, Ubuntu 24.04, lightly
+loaded home server) with two new knobs, both env-gated so the idiomatic
+baselines are untouched:
+
+- **`ENGINE=tuned`** — a second engine in Rust and C++ with identical
+  semantics (same fills, volume, and checksum on the same stream), built for
+  the hot path: a dense array-backed price ladder with best-bid/ask pointers
+  instead of an ordered tree, pooled slice-FIFO levels (head index, cleared
+  not freed), and a pre-reserved id map (FxHash in Rust, identity hash in
+  C++). Steady state approaches zero allocation.
+- **`PIN_PROD=<core> PIN_CONS=<core>`** — thread pinning (Rust via the
+  disruptor crate's `pin_at_core` + `core_affinity`; C++ via
+  `pthread_setaffinity_np`). Linux only.
+
+**Latency on Linux** (2M ops paced at 250k ops/s, µs, pinned = distinct
+physical P-cores):
+
+| config | p50 | p99 | p99.9 | p99.99 | max |
+|---|---:|---:|---:|---:|---:|
+| Rust idiomatic | 0.19 | 0.43 | 4.0 | 1,757 | 2,376 |
+| Rust idiomatic, pinned | 0.20 | 0.45 | 4.4 | 1,813 | 2,433 |
+| Rust tuned | 0.18 | 0.97 | 4.2 | 20.7 | 155 |
+| **Rust tuned, pinned** | **0.18** | **0.55** | **3.3** | **17.0** | **54.6** |
+| C++ idiomatic | 0.19 | 1.26 | 211 | 3,610 | 4,230 |
+| C++ idiomatic, pinned | 0.20 | 0.62 | 210 | 3,691 | 4,310 |
+| C++ tuned | 0.16 | 1.21 | 4.9 | 24.4 | 211 |
+| C++ tuned, pinned | 0.18 | 0.73 | 2.7 | 89.9 | 203 |
+
+**Throughput on Linux** (10M ops, ranges across runs): Rust idiomatic
+16.8–19.5M ops/s, Rust tuned 25.6–29.2M; C++ idiomatic 12.1–14.7M, C++ tuned
+15.9–16.4M.
+
+### What Round 2 shows
+
+1. **Round 1's diagnosis was wrong — the "OS tail" was mostly the
+   allocator.** Pinning did *nothing* for the idiomatic engines (p99.99
+   unchanged at ~1.8 ms Rust / ~3.7 ms C++). Switching to the
+   zero-steady-state-allocation engine collapsed p99.99 by ~75–150x *without
+   pinning*. The idiomatic tail was malloc slow paths and page faults from
+   constant node churn, not scheduler preemption. Measure, then re-measure:
+   the first attribution you believe is the one that bites you.
+2. **Pinning pays only after allocation discipline.** On the tuned engine it
+   cut Rust's max from 155 µs to 54.6 µs — worthless on the idiomatic
+   engines, a further ~3x once the allocator was out of the way. Tuning
+   layers compose in a specific order.
+3. **The tuned engines are also 35–70% faster in throughput** — the WK Selph
+   article's actual thesis (arrays + pools beat trees at the touch), verified
+   by identical checksums.
+4. **"The optimization that wasn't":** the C++ tuned map first shipped with a
+   splitmix-mixed hash — theoretically better distribution — and *lost 25%
+   throughput* to the identity hash, because sequential order ids under
+   identity hashing land in adjacent buckets and stay prefetch-friendly,
+   while a well-mixed hash scatters every lookup across a 32 MB table.
+   Cache locality beat hash quality. (`cpp/main.cpp`, `IdHash`.)
+5. **Linux out of the box beats macOS out of the box, everywhere.** Rust
+   idiomatic p99.9 is ~4 µs on Linux vs 37 µs–3 ms on macOS; medians are
+   lower; variance is smaller. The deployment platform is a bigger variable
+   than most language debates.
+6. **The study's floor so far: p99.99 = 17 µs, max = 54.6 µs across 1.6M
+   measured ops** (Rust, tuned, pinned) — four orders of magnitude below
+   where idiomatic Java on macOS started, with the algorithm and workload
+   bit-identical throughout.
+
 ## Architecture
 
 All three are the same shape — the LMAX pattern:
@@ -171,19 +237,21 @@ cd go && go build -o clob-bench .
 # C++
 cd cpp && make
 ./clob-bench all                           # same subcommands
+
+# Rust and C++ knobs (Round 2)
+ENGINE=tuned ./clob-bench all              # array-ladder engine, same checksums
+PIN_PROD=8 PIN_CONS=10 ./clob-bench all    # pin threads (Linux)
 ```
 
 Or all four, back to back, via `./run.sh`.
 
 ## Future work
 
-- **Zero-allocation variants in every language** (object pools, Agrona
-  primitive maps / preallocated slices, custom arenas in C++, array-backed
-  levels) — the fair fight, and the most instructive diff: how much of the
-  tail and throughput come back, and what the code has to give up to get
-  them.
-- Array-backed price ladder (dense ticks) replacing the tree maps everywhere.
-- Linux run with isolated, pinned cores; `perf`/dtrace flame graphs.
+- **Zero-garbage Java and Go variants** (object pools, Agrona primitive
+  maps / preallocated slices) — done for Rust and C++ in Round 2; the GC
+  languages are the remaining, and most instructive, half of that experiment.
+- Linux with `isolcpus`/`nohz_full` (true isolation, not just affinity);
+  `perf` flame graphs of the remaining tuned-engine tail.
 - Journal + replay to demonstrate deterministic recovery (the other half of
   the LMAX story).
 - Multi-producer mode (N gateway threads, one core).

@@ -4,5 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+core_affinity = "0.8.3"
 disruptor = "4.4.0"
 hdrhistogram = "7.6.0"
+rustc-hash = "2.1.3"
