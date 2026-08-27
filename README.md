@@ -462,6 +462,23 @@ languages (seed 42): 55% passive limits (1–20 ticks behind the touch), 30%
 aggressive limits (0–9 ticks into/through the spread), 15% cancels of recent
 ids; the mid random-walks in [500, 1500]. ~68% of limit orders end up trading.
 
+## Test environments
+
+| | macOS (Rounds 1–2) | Linux (Round 2) |
+|---|---|---|
+| CPU | Apple M1 Max, 10 cores (8P+2E) | Intel i9-13980HX, 24 cores / 32 threads (8P+16E, P-cores to 5.6 GHz) |
+| RAM | 32 GB | 64 GB |
+| OS | macOS 26.3.1 | Ubuntu 24.04.4 LTS, kernel 6.14 |
+| Rust | rustc 1.92 | rustc 1.97 |
+| Java | Oracle JDK 22.0.1, default G1 | Temurin JDK 22.0.2, default G1 |
+| Go | go 1.26.5 | go 1.26.5 |
+| C++ | Homebrew clang 21, `-O3 -std=c++20` | g++ 13.3, `-O3 -std=c++20` |
+| Conditions | shared desktop, no isolation | lightly loaded home server, no `isolcpus`; pinned runs on distinct physical P-cores (8, 10) |
+
+Both are everyday machines, deliberately: the study measures what languages and
+disciplines deliver under realistic conditions, not on a lab-isolated box —
+and run-to-run ranges are reported for exactly that reason.
+
 ## Methodology notes
 
 - **Coordinated omission**: in latency mode the producer is paced (250k ops/s)
