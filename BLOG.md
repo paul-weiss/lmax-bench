@@ -2,6 +2,9 @@
 
 *What building the same matching engine in Java, Rust, Go, and C++ — then tuning it, pinning it, and moving it to Linux — taught me about where latency actually comes from.*
 
+> "The first principle is that you must not fool yourself — and you are the easiest person to fool."
+> — Richard Feynman
+
 ---
 
 I've spent a good part of my career around trading systems, where one debate has run for as long as I can remember: which language do you build the hot path in? Everyone has a position. Almost nobody has measurements where *everything else is held equal* — same algorithm, same workload, same architecture, same machine — so the argument never resolves.
