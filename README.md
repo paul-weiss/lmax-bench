@@ -8,16 +8,20 @@ architecture —
 canonical Disruptor library; the pattern is ~60 lines) — benchmarked
 head-to-head on a bit-identical workload.
 
-The interesting result is not "Rust is fastest" (it is, at the median and in
-throughput). It's that **each runtime puts its latency somewhere different**:
-Java's idiomatic collections allocate fast and pay in the tail (GC); Go pays
-at the median and in throughput but keeps a remarkably tight tail (concurrent
-sub-ms GC); C++ pays malloc inline on every node — deterministic, but enough
-to lose to *Java* on throughput. And the biggest lever turns out to be
-allocation discipline, not language: once the tuned zero-allocation engines
-remove the hot-path allocator, a ~450x cross-language spread at p99.99
-compresses to ~5x — with zero-garbage Java trading blows with tuned Rust. In
-trading systems the tail is the story.
+The interesting result is not which language is fastest — that answer changed
+hands three times as the study progressed, which is itself the finding. **Each
+runtime puts its latency somewhere different**: Java's idiomatic collections
+allocate fast and pay in the tail (GC); Go pays at the median and in
+throughput but keeps a remarkably tight tail (concurrent sub-ms GC); C++ pays
+malloc inline on every node — deterministic, but enough to lose to *Java* on
+throughput. And the biggest lever turns out to be allocation discipline, not
+language: every engine that truly stopped allocating on the hot path jumped
+the ladder. Zero-garbage Java out-threw tuned Rust (Round 2); then the C++
+engine that finally *earned* its "zero-allocation" label — Round 3 below
+caught its `std::unordered_map` quietly malloc'ing a node per resting order —
+went from last place to first. A ~450x idiomatic cross-language spread at
+p99.99 compresses to ~5x once the allocator is out of the way. In trading
+systems the tail is the story.
 
 Every run of every implementation prints a deterministic checksum of the final
 book plus fill/volume counts — and **all four languages produce the same
@@ -26,8 +30,67 @@ operation stream through identical matching logic. This is what makes the
 comparison meaningful.
 
 **Prefer the story to the reference?** [BLOG.md](BLOG.md) is the narrative
-write-up — the three rounds in the order they actually happened, including the
-wrong "scheduler jitter" diagnosis and how it was caught.
+write-up — the rounds in the order they actually happened, including the wrong
+"scheduler jitter" diagnosis, how it was caught, and the study then catching
+itself making the same class of mistake a second time.
+
+## Round 3 — the "zero-allocation" engine that wasn't (Linux, C++)
+
+Round 2 (below) described the tuned C++ engine as near-zero-allocation. The
+repo's own allocation counter said otherwise: **1,029,698 heap allocations
+over a 2M-op run** — one per resting order, barely fewer than idiomatic's
+1,165,249. `std::unordered_map` is node-based *by the standard* (stable
+element addresses), so `reserve()` sizes only the bucket array: every
+`emplace` still mallocs a node, every `erase` frees one. The identity-hash
+fix (Round 2, finding 4) treated the lookup cost and left the allocator on
+the hot path — and Round 2 then mis-filed the resulting 89.9 µs p99.99 as
+C++'s runtime character. The exact failure mode this study exists to expose,
+hiding in the standard library, in the study's own code.
+
+Two changes (PR #1), semantics identical, all conformance vectors unchanged:
+
+- the id map replaced by a preallocated `std::vector<Resting>` indexed
+  directly by order id (ids are dense sequence numbers; `qty == 0` marks a
+  dead slot) — the same trick the tuned Java and Go engines already used.
+  Allocations per 2M-op run: 1,029,698 → **9,895**.
+- the SPSC ring gained the Disruptor's *cached gating sequence* (the producer
+  keeps a private lower bound of the consumer cursor and touches the shared
+  cache line only when the ring looks full) and a batch-draining consumer —
+  one acquire/release pair per batch instead of per event.
+
+**Latency** (same box, protocol, and P-cores as Round 2; ranges across runs;
+Rust rebuilt and re-run in the same session for a fair same-day comparison):
+
+| config | p50 | p99 | p99.9 | p99.99 | max |
+|---|---:|---:|---:|---:|---:|
+| C++ idiomatic, pinned (same-day baseline) | 0.19 | 1.33 | 163 | 3,305 | 3,926 |
+| C++ tuned | 0.15 | 0.57 | 2.5 | 29.4 | 179 |
+| **C++ tuned, pinned** | **0.15–0.17** | **0.45–0.63** | **2.6–3.7** | **13.7–15.3** | **74.6–116** |
+| Rust tuned, pinned (same day) | 0.17 | 0.60–0.82 | 4.9–9.7 | 38.8–42.8 | 138–158 |
+
+**Throughput** (10M ops): C++ tuned **48.7–49.2M ops/s** — up 3x from Round
+2's 15.9–16.4M, and 1.8x same-day tuned Rust (26.7M). On the Round 1 macOS
+box the same change reads 46.4M ops/s and p99.99 = 39.3 µs, unpinned.
+
+### What Round 3 shows
+
+1. **C++ went from last place to first** — p99.99 from 90 µs to 13.7–15.3 µs,
+   throughput from 16M to 49M ops/s — by deleting allocations the study had
+   already declared deleted. The gap Round 2 attributed to runtime character
+   was a million hidden mallocs.
+2. **Zero-allocation is a measured property, not a declared one.** The
+   harness's allocation counter had the truth the whole time; nobody looked
+   at it for the engine that was "obviously" allocation-free. Believe the
+   counter over the comment.
+3. **Same-day comparisons only.** Rust tuned+pinned measured 38.8–42.8 µs
+   p99.99 today against 17.0 µs in Round 2 — the un-isolated box's
+   day-to-day range. Cross-engine conclusions here come from runs in the
+   same session; numbers from different days are weather.
+4. **The ladder is provisional in the other direction too.** Rust's tuned
+   engine still pays FxHash-and-probe per id lookup where C++ now indexes an
+   array, and its ring is the crate's. Symmetric treatment is future work —
+   the podium order is a function of who most recently earned zero
+   allocation, which is precisely the point.
 
 ## Results — Linux, pinned cores, and tuned engines (Round 2)
 
@@ -40,8 +103,10 @@ baselines are untouched:
   semantics (same fills, volume, and checksum on the same stream), built for
   the hot path: a dense array-backed price ladder with best-bid/ask pointers
   instead of an ordered tree, pooled slice-FIFO levels (head index, cleared
-  not freed), and a pre-reserved id map (FxHash in Rust, identity hash in
-  C++). Steady state approaches zero allocation.
+  not freed), and a fast id store (a pre-reserved FxHash map in Rust; in C++
+  originally an identity-hashed `std::unordered_map`, since Round 3 a
+  preallocated array indexed by id). Round 2 believed both approached zero
+  allocation in steady state; Round 3 shows that was only true for Rust.
 - **`PIN_PROD=<core> PIN_CONS=<core>`** — thread pinning (Rust via the
   disruptor crate's `pin_at_core` + `core_affinity`; C++ via
   `pthread_setaffinity_np`). Linux only.
@@ -110,19 +175,23 @@ collector never runs, and the GC tail simply does not exist.
    throughput* to the identity hash, because sequential order ids under
    identity hashing land in adjacent buckets and stay prefetch-friendly,
    while a well-mixed hash scatters every lookup across a 32 MB table.
-   Cache locality beat hash quality. (`cpp/main.cpp`, `IdHash`.)
+   Cache locality beat hash quality. (The full three-step history — mixed
+   hash → identity hash → no hash at all — is preserved as a comment in
+   `cpp/tuned.hpp`; Round 3 is the third step.)
 5. **Linux out of the box beats macOS out of the box, everywhere.** Rust
    idiomatic p99.9 is ~4 µs on Linux vs 37 µs–3 ms on macOS; medians are
    lower; variance is smaller. The deployment platform is a bigger variable
    than most language debates.
-6. **The study's floor so far: p99.99 = 17 µs, max = 54.6 µs across 1.6M
-   measured ops** (Rust, tuned, pinned) — four orders of magnitude below
+6. **The study's floor after Round 2: p99.99 = 17 µs, max = 54.6 µs across
+   1.6M measured ops** (Rust, tuned, pinned) — four orders of magnitude below
    where idiomatic Java on macOS started, with the algorithm and workload
-   bit-identical throughout.
+   bit-identical throughout. (Round 3 lowered the p99.99 floor to 13.7 µs —
+   C++, tuned, pinned.)
 7. **The LMAX thesis, reproduced.** Zero-garbage Java (primitive arrays, no
    boxing, no steady-state allocation) went from p99.9 = 921 µs to
    **2.6 µs** and from 10.2M to **~30M ops/s — the fastest throughput of any
-   configuration in the study**, trading blows with tuned Rust. C2 compiles
+   configuration in the study until Round 3**, trading blows with tuned
+   Rust. C2 compiles
    allocation-free primitive-array code superbly; Java was never slow — its
    *idioms* were. The cost is that the tuned code no longer looks like Java
    anyone would write by default, which is exactly what LMAX engineers have
@@ -272,8 +341,11 @@ more than N ahead of the slowest consumer — `claim()` enforces it:
 claim(s):  wait until  s − consumer_cursor ≤ N     # else the slot still holds an unread event
 ```
 
-That wait is visible verbatim in the hand-rolled rings (`go/main.go`'s
-`claim()` spins while `next − cons > N`; `cpp/main.cpp` likewise) and happens
+That wait is visible verbatim in the hand-rolled rings (`go/ring.go`'s
+`claim()` spins while `next − cons > N`; `cpp/ring.hpp` likewise, behind a
+cached lower bound of the consumer cursor — the Disruptor's *cached gating
+sequence* — so the shared cache line is only read when the ring looks full)
+and happens
 inside `RingBuffer.next()` / `publish()` in the Java and Rust libraries. With
 multiple consumers the producer gates on the *minimum* of their cursors — at
 LMAX the slowest of journaler, replicator, and unmarshaller set the wrap limit.
@@ -306,7 +378,7 @@ the generator.
 - Transports: Java uses the original Disruptor (`BusySpinWaitStrategy`,
   `ProducerType.SINGLE`); Rust the `disruptor` crate (`BusySpin`); Go and C++
   hand-rolled SPSC rings — two cache-line-padded atomic cursors over a
-  pre-allocated event array (`go/main.go`, `cpp/main.cpp`), acquire/release
+  pre-allocated event array (`go/ring.go`, `cpp/ring.hpp`), acquire/release
   ordering, busy-spin on both sides.
 - All book state is owned by the consumer thread: no locks, no sharing, no
   concurrent data structures. Determinism is a design property, which is what
@@ -463,9 +535,10 @@ std::unordered_map<uint64_t, Resting> orders;
 | what the language enforces | nothing (GC forgives) | aliasing, via disjoint-field borrows | nothing (write-back is on you) | nothing (iterator rules are on you) |
 
 The tuned engines erase most of these differences on purpose — dense array
-ladder, pooled level FIFOs, id-indexed or reserved maps in every language — which
-is how a ~450x idiomatic spread at p99.99 compresses to ~5x: once allocation is
-out of the hot path, what remains is runtime character, not language identity.
+ladder, pooled level FIFOs, and id-indexed arrays in Java, Go, and (since
+Round 3) C++, with Rust still on a reserved FxHash map — which is how a ~450x
+idiomatic spread at p99.99 compresses to ~5x: once allocation is out of the
+hot path, what remains is runtime character, not language identity.
 
 ### The workload
 
@@ -572,6 +645,11 @@ importing. Four recipes, in descending order of uniqueness:
 
 ## Future work
 
+- **Symmetric Round 3 treatment for Rust** (and Go/Java rings): a direct
+  id-indexed array in `tuned.rs` where FxHash still hashes and probes, and
+  cached-cursor rings where the hand-rolled ones still load the shared
+  cursor per event. Until then the Round 3 ladder is provisional — see
+  Round 3, finding 4.
 - Agrona-based Java variant (the production-grade version of the primitive-
   array approach) and a `GOGC=off` Go run for completeness.
 - Linux with `isolcpus`/`nohz_full` (true isolation, not just affinity);
