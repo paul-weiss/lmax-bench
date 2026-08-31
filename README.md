@@ -72,6 +72,10 @@ Rust rebuilt and re-run in the same session for a fair same-day comparison):
 2's 15.9–16.4M, and 1.8x same-day tuned Rust (26.7M). On the Round 1 macOS
 box the same change reads 46.4M ops/s and p99.99 = 39.3 µs, unpinned.
 
+(The latency rows above were measured in a quiet window; Round 4 below puts
+the run-to-run spread of the extreme tail on the record — read its p99.99
+numbers as ranges, not points.)
+
 ### What Round 3 shows
 
 1. **C++ went from last place to first** — p99.99 from 90 µs to 13.7–15.3 µs,
@@ -91,6 +95,63 @@ box the same change reads 46.4M ops/s and p99.99 = 39.3 µs, unpinned.
    array, and its ring is the crate's. Symmetric treatment is future work —
    the podium order is a function of who most recently earned zero
    allocation, which is precisely the point.
+
+## Round 4 — measurement hygiene: warmup, a no-GC Go, and which percentile you can trust
+
+Three changes to *how* the study measures, none to what it measures —
+semantics and conformance vectors untouched throughout.
+
+**Warmup, all four versions.** Every main now runs 1M ops through a full
+discarded pipeline — its own ring, engine, and generator — before anything is
+measured, so no measured run executes cold: C2 has compiled the ring,
+handler, and matching paths in Java; branch predictors, caches, and the
+allocator are warm everywhere. The GC languages then force one collection so
+warmup garbage cannot bill a measured run (JMH does the same between
+iterations). The effect is largest where JIT and cold caches were: tuned C++
+2M-op throughput on the macOS box went **~30M → ~48M ops/s** purely from
+being measured warm, and tuned Java latency runs now report **`gc: 0
+collections` by construction**, not by luck.
+
+**Go without a collector at all.** `GODEBUG=gctrace=1` showed the tuned Go
+engine's two GC cycles per run both fire in the first ~11 ms — the pacer
+reacting to the book's construction as the id arrays step the heap 18→35 MB.
+Steady state (~10k tiny allocations per run) triggers nothing. That makes
+`GOGC=off` — native to the runtime, zero code — a safe configuration: **the
+collector never runs, period** (`gc: 0 cycles` on every run), and Linux
+tuned throughput rose **13.3M → 18.6M ops/s** (no-GC plus warm). The harness
+prints `gogc=<value>` beside the engine so every result line is
+self-documenting. Symmetric footnote: tuned *Java's* 10M-op throughput runs
+still show 2 collections — constructing its 160 MB of id arrays steps the
+heap exactly the way Go's pacer cycles did; its latency runs show zero.
+
+**The affinity trap, sequel.** The Rust warmup initially pinned the producer
+on the main thread — which narrows the affinity mask every later thread
+inherits, so the *measured* run's consumer could no longer be pinned ("No
+core with ID=10 is available", straight from the disruptor crate). The
+warmup now runs in a throwaway thread whose pin dies with it, while still
+heating the exact cores the measured run uses. Round 2, finding 8 said
+affinity plans must count threads you didn't create; this round adds:
+affinity is *inherited*, so a pin's lifetime matters as much as its target.
+
+**What repeated clean runs actually show.** With stray processes ruled out
+and the box back to ambient load, repeated same-config reps (tuned, pinned/
+restricted) put the run-to-run spread on the record (p99.99 / max, µs):
+
+| rep | C++ | Rust | Java | Go (GOGC=off) |
+|---|---:|---:|---:|---:|
+| quiet window (Round 3) | 13.7–15.3 / 75–116 | 38.8–42.8 / 138–158 | — | — |
+| busier window | 48.6–63.3 / 132–192 | 28.9–54.9 / 131–195 | 60.1 / 141 | 61.9 / 144 |
+| clean rep 1 | 38.5 / 134 | 54.9 / 136 | 88.3 / 325 | 290.6 / 885 |
+| clean rep 2 | 40.0 / 130 | 64.3 / 178 | 66.8 / 222 | 52.2 / 139 |
+
+Meanwhile **p99.9 and below barely move**: C++ 2.5–2.7, Java 2.5–2.6, Go
+2.6–4.0, Rust 4.6–9.7 µs, rep after rep. Only ~160 of 1.6M samples sit above
+p99.99, so a handful of ambient interruptions — kernel workers, the desktop
+session — own that percentile on an un-isolated box, for every language
+equally. The finding, stated once: **on shared hardware, p99.9 measures the
+engine; p99.99 measures the machine's mood.** Cross-language claims in this
+study now lean on p99.9 and report p99.99 as ranges; making p99.99
+trustworthy is exactly the `isolcpus`/`nohz_full` item in Future work.
 
 ## Results — Linux, pinned cores, and tuned engines (Round 2)
 
@@ -570,8 +631,12 @@ and run-to-run ranges are reported for exactly that reason.
   and each event is stamped with its *scheduled* publish time, not the actual
   one — a delayed publish therefore charges the delay to itself, per
   HdrHistogram practice.
-- **Warmup**: first 20% of ops are unmeasured (JIT warmup, allocator warmup,
-  map growth).
+- **Warmup**: two layers. Since Round 4, every process first runs 1M ops
+  through a full discarded pipeline (own ring, engine, generator) so no
+  measured run executes cold — C2-compiled code in Java, warm predictors,
+  caches, and allocator everywhere — with a forced collection afterwards in
+  the GC languages so warmup garbage cannot bill a measured run. Within each
+  latency run, the first 20% of ops are additionally unmeasured.
 - **Percentiles**: Java/Rust/Go record into HdrHistogram (3 significant
   digits); C++ stores every raw sample in a preallocated vector and sorts at
   the end — exact percentiles, and a cross-check that histogram resolution
@@ -610,6 +675,10 @@ cd cpp && make
 # Rust and C++ knobs (Round 2)
 ENGINE=tuned ./clob-bench all              # array-ladder engine, same checksums
 PIN_PROD=8 PIN_CONS=10 ./clob-bench all    # pin threads (Linux)
+
+# Go knob (Round 4): disable the collector outright — safe with ENGINE=tuned
+# (steady state allocates ~nothing); the gogc= line in the output confirms it
+GOGC=off ENGINE=tuned ./clob-bench all
 ```
 
 Or all four, back to back, via `./run.sh`.
@@ -651,9 +720,11 @@ importing. Four recipes, in descending order of uniqueness:
   cursor per event. Until then the Round 3 ladder is provisional — see
   Round 3, finding 4.
 - Agrona-based Java variant (the production-grade version of the primitive-
-  array approach) and a `GOGC=off` Go run for completeness.
+  array approach). (The `GOGC=off` Go run landed in Round 4.)
 - Linux with `isolcpus`/`nohz_full` (true isolation, not just affinity);
-  `perf` flame graphs of the remaining tuned-engine tail.
+  `perf` flame graphs of the remaining tuned-engine tail. After Round 4 this
+  is the main lever left: it is what would make p99.99 measure the engine
+  rather than the machine.
 - Journal + replay to demonstrate deterministic recovery (the other half of
   the LMAX story).
 - Multi-producer mode (N gateway threads, one core).
