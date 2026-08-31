@@ -10,6 +10,8 @@ So I held everything else equal.
 
 I built the same limit-order-book matching engine four times on the LMAX architecture — the single-writer pattern LMAX Exchange made famous fifteen years ago: all business state owned by one thread, fed events through a lock-free ring buffer, no locks anywhere near the matching logic. Java got the original `com.lmax.disruptor`. Rust got the `disruptor` crate. Go and C++ got hand-rolled SPSC rings, because neither has a canonical Disruptor library and the pattern is about forty lines.
 
+![The LMAX Disruptor — single-producer/single-consumer ring buffer between the workload producer and the single-writer matching core](disruptor.svg)
+
 The part I'm most pleased with is not the benchmark — it's the *proof of fairness*. All four implementations consume a bit-identical operation stream from the same splitmix64 generator (55% passive limit orders, 30% aggressive, 15% cancels, a random-walking mid), and every run prints a deterministic checksum of the final book. All four languages produce the same checksum, every run. That's only possible because the LMAX architecture makes the engine deterministic by design — and it means every number below describes *identical work*. (The full spec and reference vectors are published in the repo as a conformance suite — if you build a fifth implementation and match the checksums, your engine is behaviorally identical to all four.)
 
 ## Round 1: each runtime pays somewhere different
