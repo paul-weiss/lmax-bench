@@ -8,7 +8,7 @@ I've spent a good part of my career around trading systems, where one debate has
 
 So I held everything else equal.
 
-I built the same limit-order-book matching engine four times on the LMAX architecture — the single-writer pattern LMAX Exchange made famous fifteen years ago: all business state owned by one thread, fed events through a lock-free ring buffer, no locks anywhere near the matching logic. Java got the original `com.lmax.disruptor`. Rust got the `disruptor` crate. Go and C++ got hand-rolled SPSC rings, because neither has a canonical Disruptor library and the pattern is about forty lines.
+I built the same limit-order-book matching engine four times on the LMAX architecture — the single-writer pattern LMAX Exchange made famous fifteen years ago: all business state owned by one thread, fed events through a lock-free ring buffer, no locks anywhere near the matching logic. Java got the original [`com.lmax.disruptor`](https://github.com/LMAX-Exchange/disruptor). Rust got the [`disruptor` crate](https://crates.io/crates/disruptor). Go and C++ got hand-rolled SPSC rings, because neither has a canonical Disruptor library and the pattern is about forty lines.
 
 ![The LMAX Disruptor — single-producer/single-consumer ring buffer between the workload producer and the single-writer matching core](disruptor.svg)
 
@@ -16,7 +16,7 @@ The part I'm most pleased with is not the benchmark — it's the *proof of fairn
 
 ## Round 1: each runtime pays somewhere different
 
-On my M1 Max, with a paced producer and coordinated-omission-safe timestamps, the medians were the first surprise: **essentially identical**. Java, Rust, Go, C++ — all process an order through the ring and the book in a few hundred nanoseconds at p50. The architecture sets the median. The language debate, at the median, is about nothing.
+On my M1 Max, with a paced producer and coordinated-omission-safe timestamps, the medians were the first surprise: **essentially identical**. Java, Rust, Go, C++ — all process an order through the ring and the book in a few hundred nanoseconds at p50.[^1] The architecture sets the median. The language debate, at the median, is about nothing.
 
 The tail is where the runtimes show their character (µs, ranges across runs):
 
@@ -85,3 +85,5 @@ At p99.99, on the same Linux box, same checksummed workload:
 5. **Determinism is the highest-leverage property.** The single-writer design didn't just make the engines fast — it made them *provably comparable* across four languages with one checksum, and it's the same property that gives you replay-based recovery and an audit trail in production. The speed is a side effect.
 
 All the code, the workload spec, the conformance vectors, and every number in this post: **[github.com/paul-weiss/lmax-bench](https://github.com/paul-weiss/lmax-bench)** (MIT). Run it on your own hardware — I'd genuinely like to see the tails on an EPYC or a Graviton.
+
+[^1]: Notation, for anyone who doesn't stare at latency histograms for a living: **pN is the Nth-percentile latency** — p50 is the median, the typical operation; p99.9 is the worst operation in a thousand; p99.99 the worst in ten thousand. At millions of operations per second, a "1 in 10,000" event happens hundreds of times a second — which is why trading systems are judged by their tail, not their median.
