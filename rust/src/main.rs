@@ -27,10 +27,17 @@ fn main() {
     let mode = args.get(1).map(String::as_str).unwrap_or("all");
     let arg = |i: usize, d: u64| args.get(i).and_then(|s| s.parse().ok()).unwrap_or(d);
 
+    // Warmup: 1M ops through a full discarded pipeline (its own ring, engine,
+    // and generator) before anything is measured — branch predictors, caches,
+    // and the allocator warm up, and every language gets the identical
+    // treatment so none is measured cold.
+    println!("[rust] warmup: 1,000,000 ops (discarded)");
+    let _ = run(1_000_000, 1_000_000, None, true);
+
     if mode == "throughput" || mode == "all" {
         let ops = arg(2, 10_000_000);
         println!("[rust] throughput mode");
-        let (rep, wall) = run(ops, ops, None);
+        let (rep, wall) = run(ops, ops, None, false);
         print_report(&rep, wall, ops, false);
     }
     if mode == "latency" || mode == "all" {
@@ -40,7 +47,7 @@ fn main() {
             (2_000_000, 250_000)
         };
         println!("[rust] latency mode ({rate} ops/s paced)");
-        let (rep, wall) = run(ops, ops / 5, Some(rate));
+        let (rep, wall) = run(ops, ops / 5, Some(rate), false);
         print_report(&rep, wall, ops, true);
     }
 }

@@ -163,12 +163,15 @@ static RunResult run_impl(uint64_t total_ops, uint64_t warmup_ops, uint64_t rate
     return RunResult{std::move(rep), wall, allocs};
 }
 
-static RunResult run(uint64_t total_ops, uint64_t warmup_ops, uint64_t rate) {
+static RunResult run(uint64_t total_ops, uint64_t warmup_ops, uint64_t rate,
+                     bool quiet = false) {
     const char* eng = std::getenv("ENGINE");
     bool tuned = eng && std::strcmp(eng, "tuned") == 0;
-    int pp = env_core("PIN_PROD"), pc = env_core("PIN_CONS");
-    std::printf("  engine=%s pin_prod=%d pin_cons=%d\n",
-                tuned ? "tuned" : "idiomatic", pp, pc);
+    if (!quiet) {
+        int pp = env_core("PIN_PROD"), pc = env_core("PIN_CONS");
+        std::printf("  engine=%s pin_prod=%d pin_cons=%d\n",
+                    tuned ? "tuned" : "idiomatic", pp, pc);
+    }
     return tuned ? run_impl<TunedBook>(total_ops, warmup_ops, rate)
                  : run_impl<Book>(total_ops, warmup_ops, rate);
 }
@@ -201,6 +204,13 @@ int main(int argc, char** argv) {
     auto arg_u = [&](int i, uint64_t d) {
         return argc > i ? std::strtoull(argv[i], nullptr, 10) : d;
     };
+
+    // Warmup: 1M ops through a full discarded pipeline (its own ring, engine,
+    // and generator) before anything is measured — branch predictors, caches,
+    // and the allocator warm up, and every language gets the identical
+    // treatment so none is measured cold.
+    std::printf("[cpp] warmup: 1,000,000 ops (discarded)\n");
+    run(1'000'000, 1'000'000, 0, true);
 
     if (mode == "throughput" || mode == "all") {
         uint64_t ops = mode == "throughput" ? arg_u(2, 10'000'000) : 10'000'000;

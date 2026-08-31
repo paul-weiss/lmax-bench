@@ -14,6 +14,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"runtime"
 	"strconv"
 )
 
@@ -31,13 +32,24 @@ func main() {
 		return d
 	}
 
+	// Warmup: 1M ops through a full discarded pipeline (its own ring, engine,
+	// and generator) before anything is measured. Go has no JIT, but branch
+	// predictors, caches, the allocator, and the scheduler all warm up — and
+	// every language gets the identical treatment so none is measured cold.
+	// The forced collection reclaims the warmup garbage deterministically, so
+	// it cannot bill a measured run (with GOGC=off it is the only cycle the
+	// process ever runs).
+	fmt.Println("[go] warmup: 1,000,000 ops (discarded)")
+	run(1_000_000, 1_000_000, 0, true)
+	runtime.GC()
+
 	if mode == "throughput" || mode == "all" {
 		ops := uint64(10_000_000)
 		if mode == "throughput" {
 			ops = argU(2, ops)
 		}
 		fmt.Println("[go] throughput mode")
-		printResult(run(ops, ops, 0), ops, false)
+		printResult(run(ops, ops, 0, false), ops, false)
 	}
 	if mode == "latency" || mode == "all" {
 		ops, rate := uint64(2_000_000), uint64(250_000)
@@ -45,6 +57,6 @@ func main() {
 			ops, rate = argU(2, ops), argU(3, rate)
 		}
 		fmt.Printf("[go] latency mode (%d ops/s paced)\n", rate)
-		printResult(run(ops, ops/5, rate), ops, true)
+		printResult(run(ops, ops/5, rate, false), ops, true)
 	}
 }
