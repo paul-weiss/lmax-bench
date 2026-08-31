@@ -94,28 +94,34 @@ static RunResult run_impl(uint64_t total_ops, uint64_t warmup_ops, uint64_t rate
 
     std::thread consumer([&] {
         if (pin_cons >= 0) pin_current(pin_cons);
-        BookT book;
+        BookT book(total_ops);
         uint64_t seq = 0;
         for (;;) {
-            while (ring.prod.load(std::memory_order_acquire) == seq) {
-                // busy-spin
+            // Batch drain: read the producer cursor once, process everything
+            // published behind it, then publish the consumer cursor once. One
+            // acquire load and one release store per batch, not per event.
+            uint64_t avail;
+            while ((avail = ring.prod.load(std::memory_order_acquire)) == seq) {
+                // busy-spin: nothing published
             }
-            seq++;
-            Event& e = ring.buf[seq & ring.mask];
-            switch (e.kind) {
-                case KIND_LIMIT: book.limit(e.side, e.price, e.qty, e.id); break;
-                case KIND_CANCEL: book.cancel(e.id); break;
-                default:
-                    rep.fills = book.fills;
-                    rep.volume = book.volume;
-                    rep.resting = book.orders.size();
-                    rep.checksum = book.checksum();
-                    return;
-            }
-            if (e.ts != 0) {
-                uint64_t lat = nanos_since(epoch) - e.ts;
-                rep.samples.push_back(static_cast<uint32_t>(std::min<uint64_t>(
-                    std::max<uint64_t>(lat, 1), UINT32_MAX)));
+            while (seq < avail) {
+                seq++;
+                Event& e = ring.buf[seq & ring.mask];
+                switch (e.kind) {
+                    case KIND_LIMIT: book.limit(e.side, e.price, e.qty, e.id); break;
+                    case KIND_CANCEL: book.cancel(e.id); break;
+                    default:
+                        rep.fills = book.fills;
+                        rep.volume = book.volume;
+                        rep.resting = book.resting();
+                        rep.checksum = book.checksum();
+                        return;
+                }
+                if (e.ts != 0) {
+                    uint64_t lat = nanos_since(epoch) - e.ts;
+                    rep.samples.push_back(static_cast<uint32_t>(std::min<uint64_t>(
+                        std::max<uint64_t>(lat, 1), UINT32_MAX)));
+                }
             }
             ring.cons.store(seq, std::memory_order_release);
         }

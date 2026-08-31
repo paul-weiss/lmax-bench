@@ -25,6 +25,12 @@ struct Book {
     uint64_t fills = 0;
     uint64_t volume = 0;
 
+    // max_id is unused here (the map grows as it likes); the parameter exists
+    // so Book and TunedBook construct identically in the templated harness.
+    explicit Book(uint64_t max_id) { (void)max_id; }
+
+    size_t resting() const { return orders.size(); }
+
     void limit(uint8_t side, int64_t price, int64_t qty, uint64_t id) {
         while (qty > 0) {
             // best opposite level that crosses, else rest the residual
