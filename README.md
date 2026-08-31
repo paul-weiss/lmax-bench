@@ -25,6 +25,10 @@ checksum on the same workload**, proving they processed a bit-identical
 operation stream through identical matching logic. This is what makes the
 comparison meaningful.
 
+**Prefer the story to the reference?** [BLOG.md](BLOG.md) is the narrative
+write-up — the three rounds in the order they actually happened, including the
+wrong "scheduler jitter" diagnosis and how it was caught.
+
 ## Results — Linux, pinned cores, and tuned engines (Round 2)
 
 Round 1 (below, on macOS) blamed the Rust/C++ tail on "the OS scheduler."
