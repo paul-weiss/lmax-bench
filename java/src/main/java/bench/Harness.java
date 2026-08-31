@@ -24,10 +24,10 @@ final class Harness {
 
     record RunResult(Report report, double wallSeconds, long gcCount, long gcMillis) {}
 
-    static RunResult run(long totalOps, long warmupOps, long rate) {
+    static RunResult run(long totalOps, long warmupOps, long rate, boolean quiet) {
         AtomicReference<Report> reportRef = new AtomicReference<>();
         boolean tuned = "tuned".equals(System.getenv("ENGINE"));
-        System.out.printf("  engine=%s%n", tuned ? "tuned" : "idiomatic");
+        if (!quiet) System.out.printf("  engine=%s%n", tuned ? "tuned" : "idiomatic");
         Engine engine = tuned ? new TunedBook(totalOps) : new Book();
         Disruptor<Ev> disruptor = new Disruptor<>(
                 Ev::new, RING_SIZE, DaemonThreadFactory.INSTANCE,

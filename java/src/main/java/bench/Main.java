@@ -19,11 +19,21 @@ public final class Main {
     public static void main(String[] args) {
         String mode = args.length > 0 ? args[0] : "all";
 
+        // Warmup: 1M ops through a full discarded pipeline (its own Disruptor,
+        // engine, and generator) before anything is measured, so C2 has
+        // compiled the ring, handler, and matching paths — the measured run
+        // never executes interpreted or C1 code. The forced collection then
+        // reclaims the warmup garbage deterministically (JMH does the same
+        // between iterations), so it cannot bill a measured run.
+        System.out.println("[java] warmup: 1,000,000 ops (discarded)");
+        Harness.run(1_000_000L, 1_000_000L, 0, true);
+        System.gc();
+
         if (mode.equals("throughput") || mode.equals("all")) {
             long ops = args.length > 1 && mode.equals("throughput")
                     ? Long.parseLong(args[1]) : 10_000_000L;
             System.out.println("[java] throughput mode");
-            Harness.printResult(Harness.run(ops, ops, 0), ops, false);
+            Harness.printResult(Harness.run(ops, ops, 0, false), ops, false);
         }
         if (mode.equals("latency") || mode.equals("all")) {
             long ops = 2_000_000L;
@@ -33,7 +43,7 @@ public final class Main {
                 if (args.length > 2) rate = Long.parseLong(args[2]);
             }
             System.out.printf("[java] latency mode (%d ops/s paced)%n", rate);
-            Harness.printResult(Harness.run(ops, ops / 5, rate), ops, true);
+            Harness.printResult(Harness.run(ops, ops / 5, rate, false), ops, true);
         }
     }
 }

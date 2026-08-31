@@ -101,17 +101,19 @@ fn engine_from_env() -> (AnyBook, &'static str) {
 // `seq & (N-1)` — a single AND computing seq mod N, not a division.
 const RING_SIZE: usize = 65_536;
 
-pub fn run(total_ops: u64, warmup_ops: u64, rate: Option<u64>) -> (Report, f64) {
+pub fn run(total_ops: u64, warmup_ops: u64, rate: Option<u64>, quiet: bool) -> (Report, f64) {
     let epoch = Instant::now();
     let report: Arc<Mutex<Option<Report>>> = Arc::new(Mutex::new(None));
     let (book, engine) = engine_from_env();
     let pin_prod = env_core("PIN_PROD");
     let pin_cons = env_core("PIN_CONS");
-    println!(
-        "  engine={engine} pin_prod={} pin_cons={}",
-        pin_prod.map_or("-".into(), |c| c.to_string()),
-        pin_cons.map_or("-".into(), |c| c.to_string())
-    );
+    if !quiet {
+        println!(
+            "  engine={engine} pin_prod={} pin_cons={}",
+            pin_prod.map_or("-".into(), |c| c.to_string()),
+            pin_cons.map_or("-".into(), |c| c.to_string())
+        );
+    }
     let mut core = Core {
         book,
         hist: Histogram::new_with_bounds(1, 60_000_000_000, 3).unwrap(),
@@ -169,7 +171,9 @@ pub fn run(total_ops: u64, warmup_ops: u64, rate: Option<u64>) -> (Report, f64) 
     let allocs = ALLOCS.load(Ordering::Relaxed) - allocs0;
 
     let rep = report.lock().unwrap().take().expect("consumer did not report");
-    println!("  heap allocations during run: {allocs}");
+    if !quiet {
+        println!("  heap allocations during run: {allocs}");
+    }
     (rep, wall)
 }
 

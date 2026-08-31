@@ -27,13 +27,25 @@ type runResult struct {
 	mallocs uint64
 }
 
-func run(totalOps, warmupOps, rate uint64) runResult {
+func run(totalOps, warmupOps, rate uint64, quiet bool) runResult {
 	epoch := time.Now()
 	rb := newRing()
 	done := make(chan report, 1)
 
 	tuned := os.Getenv("ENGINE") == "tuned"
-	fmt.Printf("  engine=%s\n", map[bool]string{true: "tuned", false: "idiomatic"}[tuned])
+	// GOGC is honored natively by the runtime; GOGC=off disables collection
+	// entirely, which the tuned engine makes safe: with ~10k tiny allocations
+	// per run in steady state the heap never grows. The only cycles a default
+	// run sees are the pacer reacting to the book's construction. Printed so
+	// every result line is self-documenting about the collector it ran under.
+	gogc := os.Getenv("GOGC")
+	if gogc == "" {
+		gogc = "default"
+	}
+	if !quiet {
+		fmt.Printf("  engine=%s gogc=%s\n",
+			map[bool]string{true: "tuned", false: "idiomatic"}[tuned], gogc)
+	}
 	go func() {
 		runtime.LockOSThread()
 		var b engine
