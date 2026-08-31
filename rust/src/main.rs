@@ -30,9 +30,18 @@ fn main() {
     // Warmup: 1M ops through a full discarded pipeline (its own ring, engine,
     // and generator) before anything is measured — branch predictors, caches,
     // and the allocator warm up, and every language gets the identical
-    // treatment so none is measured cold.
+    // treatment so none is measured cold. Run in a throwaway thread: the
+    // warmup's producer pinning must die with it, because a pinned main
+    // thread narrows the affinity mask every later thread inherits, and the
+    // disruptor crate refuses to pin to a core outside that mask. The warmup
+    // still runs on the PIN_* cores, so it heats exactly the cores the
+    // measured run will use.
     println!("[rust] warmup: 1,000,000 ops (discarded)");
-    let _ = run(1_000_000, 1_000_000, None, true);
+    std::thread::spawn(|| {
+        let _ = run(1_000_000, 1_000_000, None, true);
+    })
+    .join()
+    .expect("warmup run failed");
 
     if mode == "throughput" || mode == "all" {
         let ops = arg(2, 10_000_000);
