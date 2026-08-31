@@ -1,8 +1,7 @@
 #pragma once
-// Tuned book: array ladder + best pointers + identity-hashed reserved map.
+// Tuned book: array ladder + best pointers + id-indexed order array.
 
 #include <cstdint>
-#include <unordered_map>
 #include <vector>
 
 #include "book.hpp"
@@ -11,22 +10,24 @@
 // Same semantics as Book (identical fills/volume/checksum on the same
 // stream), engineered for the hot path: dense array-backed price ladder with
 // best-bid/best-ask pointers instead of a tree, slice-FIFO levels (head
-// index, cleared not freed), identity-hashed id map with reserved capacity
-// (ids are already well-distributed sequence numbers). Steady state
-// approaches zero allocation.
+// index, cleared not freed), and the id map replaced outright by a
+// preallocated array indexed by order id (ids are dense sequence numbers;
+// qty == 0 marks a dead slot). Steady state is zero-allocation.
+//
+// The id store's history, preserved because the temptation recurs:
+//   1. std::unordered_map with a splitmix-mixed hash — textbook, and 25%
+//      SLOWER than the idiomatic engine: well-mixed hashing scattered every
+//      lookup across a 32MB table, a cache miss each.
+//   2. Identity hash — sequential ids land in adjacent buckets, lookups went
+//      cache-resident, throughput recovered. But std::unordered_map is
+//      node-based BY THE STANDARD (stable element addresses), so reserve()
+//      only sizes the bucket array: every emplace still mallocs a node and
+//      every erase frees one — ~1M hidden allocations per 2M-op run, and the
+//      allocator's slow paths landed exactly where this engine's tail was.
+//   3. No hash at all — the array below. The ids are the indexes.
 
 constexpr int64_t LADDER_BASE = 0;
 constexpr size_t LADDER_LEN = 4096; // workload prices stay well inside [480, 1521]
-
-struct IdHash {
-    size_t operator()(uint64_t v) const noexcept {
-        // Identity hash, deliberately: order ids are unique sequence numbers,
-        // and identity clusters them into adjacent buckets — sequential ids
-        // stay prefetch-friendly. A "well-mixed" hash here scatters every
-        // lookup across the table and measurably LOSES throughput.
-        return static_cast<size_t>(v);
-    }
-};
 
 struct FlatLevel {
     std::vector<uint64_t> ids;
@@ -40,11 +41,17 @@ struct TunedBook {
     std::vector<FlatLevel> asks{LADDER_LEN};
     int64_t best_bid = -1;
     int64_t best_ask = INT64_MAX;
-    std::unordered_map<uint64_t, Resting, IdHash> orders;
+    std::vector<Resting> orders; // indexed by id; qty == 0 = no such order
+    size_t live = 0;
     uint64_t fills = 0;
     uint64_t volume = 0;
 
-    TunedBook() { orders.reserve(1u << 21); }
+    // max_id bounds the ids the workload can emit (one per op at most).
+    // Zero-initializing the array also touches every page up front, so no
+    // first-touch fault lands in the measured region.
+    explicit TunedBook(uint64_t max_id) : orders(max_id + 2) {}
+
+    size_t resting() const { return live; }
 
     void limit(uint8_t side, int64_t price, int64_t qty, uint64_t id) {
         while (qty > 0) {
@@ -57,18 +64,18 @@ struct TunedBook {
             while (qty > 0) {
                 if (lvl.empty()) break;
                 uint64_t head = lvl.ids[lvl.head];
-                auto oit = orders.find(head);
-                if (oit == orders.end()) { // lazily-cancelled order
+                Resting& r = orders[head];
+                if (r.qty == 0) { // lazily-cancelled order
                     lvl.head++;
                     continue;
                 }
-                int64_t m = std::min(qty, oit->second.qty);
-                oit->second.qty -= m;
+                int64_t m = std::min(qty, r.qty);
+                r.qty -= m;
                 qty -= m;
                 fills++;
                 volume += static_cast<uint64_t>(m);
-                if (oit->second.qty == 0) {
-                    orders.erase(oit);
+                if (r.qty == 0) {
+                    live--;
                     lvl.head++;
                 }
             }
@@ -97,22 +104,29 @@ struct TunedBook {
                 asks[idx].ids.push_back(id);
                 best_ask = std::min(best_ask, price);
             }
-            orders.emplace(id, Resting{price, qty});
+            orders[id] = Resting{price, qty};
+            live++;
         }
     }
 
-    void cancel(uint64_t id) { orders.erase(id); }
+    void cancel(uint64_t id) {
+        Resting& r = orders[id]; // id 0 (saturated cancel) hits the dead slot 0
+        if (r.qty != 0) {
+            r.qty = 0;
+            live--;
+        }
+    }
 
     uint64_t checksum() const {
         uint64_t acc = 0;
         auto fold = [&](const std::vector<FlatLevel>& side) {
             for (const auto& lvl : side) {
                 for (size_t i = lvl.head; i < lvl.ids.size(); i++) {
-                    auto oit = orders.find(lvl.ids[i]);
-                    if (oit != orders.end()) {
+                    const Resting& r = orders[lvl.ids[i]];
+                    if (r.qty != 0) {
                         SplitMix64 s{acc ^ lvl.ids[i] ^
-                                     (static_cast<uint64_t>(oit->second.price) << 20) ^
-                                     static_cast<uint64_t>(oit->second.qty)};
+                                     (static_cast<uint64_t>(r.price) << 20) ^
+                                     static_cast<uint64_t>(r.qty)};
                         acc = s.next();
                     }
                 }

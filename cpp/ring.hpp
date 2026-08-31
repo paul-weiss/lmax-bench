@@ -25,11 +25,19 @@ struct Ring {
     uint64_t mask = RING_SIZE - 1;  // all ones: seq & mask == seq mod RING_SIZE
     alignas(64) std::atomic<uint64_t> prod{0};
     alignas(64) std::atomic<uint64_t> cons{0};
+    // Producer-private cache of the consumer cursor (the Disruptor's cached
+    // gating sequence). `cons` lives on a cache line the consumer writes every
+    // batch; loading it on every claim ping-pongs that line between the two
+    // cores. The cached value is a lower bound on the consumer's progress, so
+    // the shared line is only touched when the cache says the ring LOOKS full.
+    alignas(64) uint64_t cons_seen = 0;
 
     Event* claim() {
         uint64_t next = prod.load(std::memory_order_relaxed) + 1;
-        while (next - cons.load(std::memory_order_acquire) > RING_SIZE) {
-            // busy-spin: ring full
+        if (next - cons_seen > RING_SIZE) {
+            while (next - (cons_seen = cons.load(std::memory_order_acquire)) > RING_SIZE) {
+                // busy-spin: ring full
+            }
         }
         return &buf[next & mask];
     }
